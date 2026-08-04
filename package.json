@@ -1,0 +1,16 @@
+{
+  "name": "tg-gemini-userbot",
+  "version": "1.0.0",
+  "description": "Юзербот для Telegram: команда !answer генерирует ответ через Gemini API",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "telegram": "^2.22.2",
+    "input": "^1.0.1"
+  }
+}
