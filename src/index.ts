@@ -1,6 +1,7 @@
-import { TelegramClient } from "telegram";
+import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { NewMessage } from "telegram/events";
+// @ts-ignore
 import input from "input";
 import { ENV } from "./config/env";
 import { onNewMessage } from "./modules/events/onNewMessage";
@@ -46,11 +47,13 @@ async function main() {
         numeric: /^\d+$/.test(code),
       });
 
-      await client.signIn({
-        phoneNumber: phone,
-        phoneCodeHash: sendResult.phoneCodeHash,
-        phoneCode: code,
-      });
+      await client.invoke(
+        new Api.auth.SignIn({
+          phoneNumber: phone,
+          phoneCodeHash: sendResult.phoneCodeHash,
+          phoneCode: code,
+        })
+      );
 
       console.log("[tg] sign in ok");
       console.log("Сохрани эту строку в .env как TG_SESSION:");
