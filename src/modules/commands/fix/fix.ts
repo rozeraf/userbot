@@ -42,6 +42,7 @@ Your task is to correct any grammatical, spelling, punctuation, and stylistic er
 Rules:
 - Output ONLY the corrected text. Do not include any introduction, explanations, comparison/diff, markdown code blocks, quotes, or conversational filler. Just the corrected text.
 - Maintain the original meaning, tone, format, emojis, and language.
+- Pay explicit attention to punctuation and capitalization: ensure sentence-starting letters are capitalized, proper names are capitalized, and missing or incorrect commas, periods, and other punctuation marks are correctly placed.
 - If the original text is correct and has no errors, output the original text exactly.`;
 
     console.log("[fix] prompt length:", prompt.length);
