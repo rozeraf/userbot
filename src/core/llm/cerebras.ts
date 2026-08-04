@@ -15,7 +15,7 @@ function nowMs(): number {
   return Date.now();
 }
 
-export async function askCerebras(prompt: string): Promise<string> {
+export async function askCerebras(prompt: string, systemPrompt?: string): Promise<string> {
   const url = "https://api.cerebras.ai/v1/chat/completions";
 
   const t0 = nowMs();
@@ -23,8 +23,9 @@ export async function askCerebras(prompt: string): Promise<string> {
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [];
 
-  if (ENV.SYSTEM_PROMPT) {
-    messages.push({ role: "system", content: ENV.SYSTEM_PROMPT });
+  const activeSystemPrompt = systemPrompt ?? ENV.SYSTEM_PROMPT;
+  if (activeSystemPrompt) {
+    messages.push({ role: "system", content: activeSystemPrompt });
   }
 
   messages.push({ role: "user", content: prompt });

@@ -18,7 +18,7 @@ function nowMs(): number {
   return Date.now();
 }
 
-export async function askGemini(prompt: string): Promise<string> {
+export async function askGemini(prompt: string, systemPrompt?: string): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${ENV.GEMINI_MODEL}:generateContent?key=${ENV.GEMINI_API_KEY}`;
 
   const t0 = nowMs();
@@ -32,9 +32,10 @@ export async function askGemini(prompt: string): Promise<string> {
     ],
   };
 
-  if (ENV.SYSTEM_PROMPT) {
+  const activeSystemPrompt = systemPrompt ?? ENV.SYSTEM_PROMPT;
+  if (activeSystemPrompt) {
     body.systemInstruction = {
-      parts: [{ text: ENV.SYSTEM_PROMPT }],
+      parts: [{ text: activeSystemPrompt }],
     };
   }
 
