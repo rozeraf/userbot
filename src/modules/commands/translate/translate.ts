@@ -23,9 +23,13 @@ export const translateCommand: CommandModule = {
     });
 
     if (!userInput && !originalText) {
-      await message.reply({
-        message: "Нужно либо ответить на сообщение с указанием языка (например: !translate ru), либо написать текст после !translate (например: !translate apple).",
-      });
+      try {
+        await message.reply({
+          message: "Нужно либо ответить на сообщение с указанием языка (например: !translate ru), либо написать текст после !translate (например: !translate apple).",
+        });
+      } catch (replyErr) {
+        console.error("[translate] failed to send input validation reply:", replyErr);
+      }
       return true;
     }
 
@@ -69,17 +73,30 @@ ${userInput}
       });
 
       const sendStart = nowMs();
-      await client.sendMessage(message.chatId!, {
-        message: answer,
-        ...(replyToId ? { replyTo: replyToId } : {}),
-      });
+      try {
+        await client.sendMessage(message.chatId!, {
+          message: answer,
+          ...(replyToId ? { replyTo: replyToId } : {}),
+        });
+      } catch (sendErr) {
+        console.error("[translate] telegram send message error:", sendErr);
+        try {
+          await message.reply({ message: "Ошибка при отправке ответа перевода в Telegram." });
+        } catch (replyErr) {
+          console.error("[translate] failed to send telegram error reply:", replyErr);
+        }
+      }
 
       console.log("[translate] telegram send done inMs:", nowMs() - sendStart);
       console.log("[translate] total elapsed inMs:", nowMs() - t0);
       return true;
     } catch (err) {
       console.error("[translate] error:", err);
-      await message.reply({ message: "Ошибка при переводе, смотри логи." });
+      try {
+        await message.reply({ message: "Ошибка при переводе, смотри логи." });
+      } catch (replyErr) {
+        console.error("[translate] failed to send error reply:", replyErr);
+      }
       return true;
     }
   },

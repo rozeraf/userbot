@@ -24,9 +24,13 @@ export const answerCommand: CommandModule = {
     });
 
     if (!userPrompt && !originalText) {
-      await message.reply({
-        message: "Нужно либо ответить на сообщение, либо написать промпт после !answer.",
-      });
+      try {
+        await message.reply({
+          message: "Нужно либо ответить на сообщение, либо написать промпт после !answer.",
+        });
+      } catch (replyErr) {
+        console.error("[answer] failed to send input validation reply:", replyErr);
+      }
       return true;
     }
 
@@ -48,17 +52,30 @@ export const answerCommand: CommandModule = {
       });
 
       const sendStart = nowMs();
-      await client.sendMessage(message.chatId!, {
-        message: answer,
-        ...(replyToId ? { replyTo: replyToId } : {}),
-      });
+      try {
+        await client.sendMessage(message.chatId!, {
+          message: answer,
+          ...(replyToId ? { replyTo: replyToId } : {}),
+        });
+      } catch (sendErr) {
+        console.error("[answer] telegram send message error:", sendErr);
+        try {
+          await message.reply({ message: "Ошибка при отправке ответа в Telegram." });
+        } catch (replyErr) {
+          console.error("[answer] failed to send telegram error reply:", replyErr);
+        }
+      }
 
       console.log("[answer] telegram send done inMs:", nowMs() - sendStart);
       console.log("[answer] total elapsed inMs:", nowMs() - t0);
       return true;
     } catch (err) {
       console.error("[answer] error:", err);
-      await message.reply({ message: "Ошибка при обращении к LLM, смотри логи." });
+      try {
+        await message.reply({ message: "Ошибка при обращении к LLM, смотри логи." });
+      } catch (replyErr) {
+        console.error("[answer] failed to send LLM error reply:", replyErr);
+      }
       return true;
     }
   },

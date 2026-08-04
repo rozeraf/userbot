@@ -6,12 +6,26 @@ import input from "input";
 import { ENV } from "./config/env";
 import { onNewMessage } from "./modules/events/onNewMessage";
 
+// Global process error catchers to prevent bot crashes on network failures
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[process] Uncaught Exception thrown:", error);
+});
+
 async function main() {
   const session = new StringSession(ENV.TG_SESSION);
 
   const client = new TelegramClient(session, ENV.TG_API_ID, ENV.TG_API_HASH, {
     connectionRetries: 5,
   });
+
+  // Log connection info
+  if (client.disconnected) {
+    console.log("[tg] Client starting in disconnected state");
+  }
 
   console.log("[tg] start connect");
   await client.connect();

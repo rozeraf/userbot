@@ -30,33 +30,46 @@ export async function askCerebras(prompt: string, systemPrompt?: string): Promis
 
   messages.push({ role: "user", content: prompt });
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ENV.CEREBRAS_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: ENV.CEREBRAS_MODEL,
-      messages,
-      temperature: 0.7,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-  console.log("[cerebras] status:", res.status, "elapsedMs:", nowMs() - t0);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ENV.CEREBRAS_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ENV.CEREBRAS_MODEL,
+        messages,
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error("[cerebras] error body:", errText);
-    throw new Error(`Cerebras API error ${res.status}: ${errText}`);
+    console.log("[cerebras] status:", res.status, "elapsedMs:", nowMs() - t0);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[cerebras] error body:", errText);
+      throw new Error(`Cerebras API error ${res.status}: ${errText}`);
+    }
+
+    const data = (await res.json()) as CerebrasChatResponse;
+    console.log("[cerebras] raw response keys:", Object.keys(data ?? {}));
+
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) throw new Error("Cerebras returned empty response");
+
+    console.log("[cerebras] response ok, totalMs:", nowMs() - t0);
+    return normalizeText(text);
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw new Error("Cerebras API request timed out (45s)");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = (await res.json()) as CerebrasChatResponse;
-  console.log("[cerebras] raw response keys:", Object.keys(data ?? {}));
-
-  const text = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Cerebras returned empty response");
-
-  console.log("[cerebras] response ok, totalMs:", nowMs() - t0);
-  return normalizeText(text);
 }

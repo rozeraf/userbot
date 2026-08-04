@@ -39,26 +39,39 @@ export async function askGemini(prompt: string, systemPrompt?: string): Promise<
     };
   }
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-  console.log("[gemini] status:", res.status, "elapsedMs:", nowMs() - t0);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error("[gemini] error body:", errText);
-    throw new Error(`Gemini API error ${res.status}: ${errText}`);
+    console.log("[gemini] status:", res.status, "elapsedMs:", nowMs() - t0);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[gemini] error body:", errText);
+      throw new Error(`Gemini API error ${res.status}: ${errText}`);
+    }
+
+    const data = (await res.json()) as GeminiResponse;
+    console.log("[gemini] raw response keys:", Object.keys(data ?? {}));
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("Gemini returned empty response");
+
+    console.log("[gemini] response ok, totalMs:", nowMs() - t0);
+    return normalizeText(text);
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw new Error("Gemini API request timed out (45s)");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = (await res.json()) as GeminiResponse;
-  console.log("[gemini] raw response keys:", Object.keys(data ?? {}));
-
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini returned empty response");
-
-  console.log("[gemini] response ok, totalMs:", nowMs() - t0);
-  return normalizeText(text);
 }

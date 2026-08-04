@@ -6,6 +6,8 @@ function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
 }
 
+let commandQueue = Promise.resolve();
+
 export async function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   const message = event.message;
   const text = normalizeText(message?.text ?? "");
@@ -21,7 +23,15 @@ export async function onNewMessage(event: NewMessageEvent, client: TelegramClien
 
   for (const command of COMMANDS) {
     if (!command.match(text)) continue;
-    await command.run({ client, message, text });
+    
+    // Queue command execution sequentially
+    commandQueue = commandQueue.then(async () => {
+      try {
+        await command.run({ client, message, text });
+      } catch (err) {
+        console.error(`[event] Error executing command "${command.name}":`, err);
+      }
+    });
     return;
   }
 }

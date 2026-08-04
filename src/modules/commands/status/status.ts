@@ -5,9 +5,13 @@ export const statusCommand: CommandModule = {
   name: "status",
   match: (text) => text === "!status",
   async run({ message }) {
-    await message.reply({
-      message: `Активный провайдер: ${state.getProvider()}`,
-    });
+    try {
+      await message.reply({
+        message: `Активный провайдер: ${state.getProvider()}`,
+      });
+    } catch (err) {
+      console.error("[status] failed to send reply:", err);
+    }
     return true;
   },
 };

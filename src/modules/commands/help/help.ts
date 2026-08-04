@@ -11,7 +11,11 @@ export const helpCommand: CommandModule = {
 🌐 !translate [язык] [текст] - Перевести текст на указанный язык (по умолчанию русский) с автоопределением исходного языка.
 ❓ !help - Показать это справочное сообщение.`;
 
-    await message.reply({ message: helpText });
+    try {
+      await message.reply({ message: helpText });
+    } catch (err) {
+      console.error("[help] failed to send reply:", err);
+    }
     return true;
   },
 };
