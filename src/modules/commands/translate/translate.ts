@@ -1,6 +1,6 @@
-import { askCurrent } from "../../core/llm";
-import { preview } from "../../core/llm/prompt";
-import type { CommandModule } from "./types";
+import { askCurrent } from "../../../core/llm";
+import { preview } from "../../../core/llm/prompt";
+import type { CommandModule } from "../types";
 
 function nowMs(): number {
   return Date.now();

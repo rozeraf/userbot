@@ -1,5 +1,5 @@
-import { state } from "../../core/state";
-import type { CommandModule } from "./types";
+import { state } from "../../../core/state";
+import type { CommandModule } from "../types";
 
 export const statusCommand: CommandModule = {
   name: "status",

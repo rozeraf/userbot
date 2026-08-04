@@ -1,4 +1,4 @@
-import type { CommandModule } from "./types";
+import type { CommandModule } from "../types";
 
 export const helpCommand: CommandModule = {
   name: "help",

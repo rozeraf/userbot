@@ -1,6 +1,6 @@
-import { askCurrent } from "../../core/llm";
-import { buildPrompt, preview } from "../../core/llm/prompt";
-import type { CommandModule } from "./types";
+import { askCurrent } from "../../../core/llm";
+import { buildPrompt, preview } from "../../../core/llm/prompt";
+import type { CommandModule } from "../types";
 
 function nowMs(): number {
   return Date.now();
