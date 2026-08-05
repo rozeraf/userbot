@@ -10,7 +10,11 @@
     "start": "bun run index.ts"
   },
   "dependencies": {
-    "telegram": "^2.22.2",
-    "input": "^1.0.1"
+    "drizzle-orm": "^0.45.2",
+    "input": "^1.0.1",
+    "telegram": "^2.22.2"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }
