@@ -1,6 +1,7 @@
 import { ENV } from "../../../config/env";
 import { state } from "../../../core/state";
 import type { CommandModule } from "../types";
+import { database } from "../../../core/db";
 
 export const providerCommand: CommandModule = {
   name: "provider",
@@ -17,6 +18,12 @@ export const providerCommand: CommandModule = {
       }
       state.setProvider("gemini");
       console.log("[state] provider switched to gemini");
+      database.logEvent({
+        eventType: "provider_changed",
+        level: "info",
+        message: "LLM provider switched to gemini",
+        metadata: { provider: "gemini" },
+      });
       try {
         await message.reply({ message: "Провайдер переключен на Gemini." });
       } catch (replyErr) {
@@ -36,6 +43,12 @@ export const providerCommand: CommandModule = {
       }
       state.setProvider("cerebras");
       console.log("[state] provider switched to cerebras");
+      database.logEvent({
+        eventType: "provider_changed",
+        level: "info",
+        message: "LLM provider switched to cerebras",
+        metadata: { provider: "cerebras" },
+      });
       try {
         await message.reply({ message: "Провайдер переключен на Cerebras." });
       } catch (replyErr) {

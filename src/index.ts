@@ -1,12 +1,3 @@
-// Global process error catchers to prevent bot crashes on network failures
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
-});
-
-process.on("uncaughtException", (error) => {
-  console.error("[process] Uncaught Exception thrown:", error);
-});
-
 import { TelegramClient, Api } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { NewMessage } from "telegram/events";
@@ -14,8 +5,37 @@ import { NewMessage } from "telegram/events";
 import input from "input";
 import { ENV } from "./config/env";
 import { onNewMessage } from "./modules/events/onNewMessage";
+import { database } from "./core/db";
+
+// Global process error catchers to prevent bot crashes on network failures
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
+  database.logEvent({
+    eventType: "process_unhandled_rejection",
+    level: "error",
+    message: String(reason),
+  });
+  database.flush();
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[process] Uncaught Exception thrown:", error);
+  database.logEvent({
+    eventType: "process_uncaught_exception",
+    level: "error",
+    message: error.message || String(error),
+    metadata: { stack: error.stack },
+  });
+  database.flush();
+});
 
 async function main() {
+  database.logEvent({
+    eventType: "bot_start",
+    level: "info",
+    message: "Starting tg-gemini-userbot",
+    metadata: { hasSession: Boolean(ENV.TG_SESSION) },
+  });
   const session = new StringSession(ENV.TG_SESSION);
 
   const client = new TelegramClient(session, ENV.TG_API_ID, ENV.TG_API_HASH, {
@@ -32,6 +52,11 @@ async function main() {
   console.log("[tg] start connect");
   await client.connect();
   console.log("[tg] connected");
+  database.logEvent({
+    eventType: "tg_connected",
+    level: "info",
+    message: "Telegram client connected successfully",
+  });
 
   const authorized = await client.checkAuthorization();
   console.log("[tg] already authorized:", authorized);
@@ -82,6 +107,12 @@ async function main() {
 
   console.log("Юзербот запущен.");
   console.log("[tg] initial provider:", ENV.LLM_PROVIDER);
+  database.logEvent({
+    eventType: "bot_ready",
+    level: "info",
+    message: "Userbot is running and listening for messages",
+    metadata: { initialProvider: ENV.LLM_PROVIDER },
+  });
 
   client.addEventHandler(
     (event) => onNewMessage(event, client),
@@ -91,5 +122,12 @@ async function main() {
 
 main().catch((err) => {
   console.error("[fatal]", err);
+  database.logEvent({
+    eventType: "bot_fatal",
+    level: "error",
+    message: err.message || String(err),
+    metadata: { stack: err.stack },
+  });
+  database.flush();
   process.exit(1);
 });

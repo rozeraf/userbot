@@ -36,3 +36,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Local state
 .provider_state.json
 
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
