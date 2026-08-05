@@ -1,11 +1,3 @@
-import { TelegramClient, Api } from "telegram";
-import { StringSession } from "telegram/sessions";
-import { NewMessage } from "telegram/events";
-// @ts-ignore
-import input from "input";
-import { ENV } from "./config/env";
-import { onNewMessage } from "./modules/events/onNewMessage";
-
 // Global process error catchers to prevent bot crashes on network failures
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
@@ -15,11 +7,21 @@ process.on("uncaughtException", (error) => {
   console.error("[process] Uncaught Exception thrown:", error);
 });
 
+import { TelegramClient, Api } from "telegram";
+import { StringSession } from "telegram/sessions";
+import { NewMessage } from "telegram/events";
+// @ts-ignore
+import input from "input";
+import { ENV } from "./config/env";
+import { onNewMessage } from "./modules/events/onNewMessage";
+
 async function main() {
   const session = new StringSession(ENV.TG_SESSION);
 
   const client = new TelegramClient(session, ENV.TG_API_ID, ENV.TG_API_HASH, {
-    connectionRetries: 5,
+    connectionRetries: Infinity,
+    autoReconnect: true,
+    floodSleepThreshold: 60,
   });
 
   // Log connection info
