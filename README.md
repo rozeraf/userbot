@@ -1,73 +1,276 @@
 # tg-gemini-userbot
 
-Юзербот для Telegram: команда `!answer` генерирует ответ через Gemini API и отправляет его от твоего имени.
+Telegram userbot, работающий под твоим личным аккаунтом через MTProto (GramJS). Пишешь команду в любой чат — бот отвечает от твоего имени через LLM.
 
-Работает через MTProto (библиотека `telegram` / gramjs), то есть логинится под твоим личным аккаунтом, а не через Bot API - это позволяет отвечать в любых чатах, где ты состоишь.
+Поддерживает **Gemini** (Google) и **Cerebras** как провайдеры; переключаются на лету командой прямо в Telegram. Весь трафик (сообщения, вызовы LLM, события) логируется в локальную SQLite-базу через [Drizzle ORM](https://orm.drizzle.team/).
+
+---
+
+## Команды
+
+| Команда | Описание |
+|---|---|
+| `!answer [инструкция]` | Генерирует ответ через активный LLM. Можно использовать как reply на сообщение — тогда это сообщение станет контекстом, а инструкция — инструкцией |
+| `!translate [язык] [текст]` | Переводит текст. Язык: код (`ru`, `en`) или название (`русский`). Без языка — на русский |
+| `!fix [текст]` | Исправляет орфографию и пунктуацию, сохраняя смысл и тон |
+| `!summarize [текст]` | Создаёт краткое содержание длинного текста или reply-сообщения |
+| `!explain [понятие]` | Объясняет термин или reply-сообщение простым языком |
+| `!remind [время] [текст]` | Устанавливает напоминание через `@longarmraf_bot` |
+| `!gemini` | Переключает активный провайдер на Gemini |
+| `!cerebras` | Переключает активный провайдер на Cerebras |
+| `!status` | Показывает текущий активный провайдер |
+| `!help` | Показывает список всех команд |
+
+> Бот реагирует **только на твои собственные сообщения** (`message.out`). На чужие команды не реагирует.
+
+---
 
 ## Требования
 
-- Bun >= 1.0
-- Аккаунт Telegram и доступ к https://my.telegram.org для получения `api_id` и `api_hash`
-- Ключ Gemini API (Google AI Studio)
+- [Bun](https://bun.sh/) ≥ 1.0
+- Telegram-аккаунт + `api_id` / `api_hash` с [my.telegram.org](https://my.telegram.org)
+- API-ключ Gemini ([Google AI Studio](https://aistudio.google.com/)) и/или Cerebras
 
-## Настройка
+---
 
-1. Установить зависимости:
+## Установка и запуск
 
-```
+### 1. Клонировать и установить зависимости
+
+```bash
+git clone <repo>
+cd userbot
 bun install
 ```
 
-2. Получить `api_id` и `api_hash`:
-   - зайти на https://my.telegram.org
-   - авторизоваться под своим номером
-   - создать приложение в разделе API development tools
+### 2. Получить Telegram API credentials
 
-3. Получить ключ Gemini API в Google AI Studio.
+1. Зайти на [my.telegram.org](https://my.telegram.org) и авторизоваться
+2. Открыть раздел **API development tools**
+3. Создать приложение — получить `api_id` и `api_hash`
 
-4. Скопировать `.env.example` в `.env`:
+### 3. Заполнить `.env`
 
-```
+Скопировать `.env.example` в `.env`:
+
+```bash
 cp .env.example .env
 ```
 
-5. Заполнить в `.env`:
-   - `TG_API_ID` - из шага 2
-   - `TG_API_HASH` - из шага 2
-   - `GEMINI_API_KEY` - из шага 3
-   - `GEMINI_MODEL` - можно оставить по умолчанию (`gemini-2.0-flash`)
-   - `TG_SESSION` - оставить пустым на первый запуск
+Заполнить:
 
-6. Первый запуск:
+```env
+TG_API_ID=12345678
+TG_API_HASH=abcdef1234567890abcdef1234567890
 
+# LLM — выбрать один провайдер по умолчанию:
+LLM_PROVIDER=gemini          # или cerebras
+
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.0-flash   # опционально
+
+CEREBRAS_API_KEY=...
+CEREBRAS_MODEL=gpt-oss-120b     # опционально
+
+# Системный промпт (общий стиль ответов):
+SYSTEM_PROMPT="Отвечай кратко и по существу."
+
+# После первой авторизации заполняется автоматически:
+TG_SESSION=
 ```
+
+### 4. Первый запуск (авторизация)
+
+```bash
 bun run index.ts
 ```
 
-При первом запуске скрипт запросит номер телефона, код из Telegram и пароль (если включена двухфакторная аутентификация). После успешного входа в консоль выведется session string - его нужно скопировать в `.env` как `TG_SESSION`, чтобы не логиниться заново при следующих запусках.
+Бот запросит номер телефона и код из Telegram. После успешной авторизации в консоль выведется `TG_SESSION` — вставить его в `.env`. Повторная авторизация больше не потребуется.
 
-7. Последующие запуски (после того как `TG_SESSION` заполнен):
+### 5. Последующие запуски
 
+```bash
+bun start
 ```
-bun run start
-```
 
-## Использование
-
-- `!answer` ответом на сообщение - Gemini отвечает на это сообщение
-- `!answer твой промпт` без ответа на сообщение - Gemini отвечает прямо на промпт
-- `!answer твой промпт` ответом на сообщение - промпт используется как инструкция, текст сообщения как контекст, оба передаются в Gemini вместе
-
-Команда срабатывает только если её отправил сам владелец аккаунта - на чужие сообщения с `!answer` юзербот не реагирует.
+---
 
 ## Структура проекта
 
-- `index.ts` - основная логика юзербота
-- `package.json` - зависимости и скрипты
-- `.env.example` - шаблон переменных окружения
+```
+src/
+├── index.ts                    # Точка входа: инициализация клиента, авторизация
+├── config/
+│   └── env.ts                  # Валидация переменных окружения
+├── core/
+│   ├── db/
+│   │   ├── schema.ts           # Схема таблиц (Drizzle) — единственное место правды
+│   │   ├── client.ts           # SQLite + WAL + drizzle() + migrate()
+│   │   ├── index.ts            # Буферизованный logging API (logMessage / logLLMCall / logEvent)
+│   │   └── migrations/         # SQL-миграции, генерируются drizzle-kit
+│   ├── llm/
+│   │   ├── index.ts            # askCurrent() / askByProvider() + автологирование вызовов
+│   │   ├── gemini.ts           # Gemini REST API (fetch + AbortController, 45s timeout)
+│   │   ├── cerebras.ts         # Cerebras OpenAI-compatible API
+│   │   └── prompt.ts           # buildPrompt(), normalizeText(), preview()
+│   └── state.ts                # Активный провайдер — in-memory + сохранение на диск
+└── modules/
+    ├── events/
+    │   └── onNewMessage.ts     # Роутер событий → COMMANDS, sequential command queue
+    └── commands/
+        ├── answer/             # !answer
+        ├── explain/            # !explain
+        ├── fix/                # !fix
+        ├── help/               # !help
+        ├── provider/           # !gemini / !cerebras
+        ├── remind/             # !remind
+        ├── status/             # !status
+        ├── summarize/          # !summarize
+        └── translate/          # !translate
+
+drizzle.config.ts               # Конфиг drizzle-kit
+```
+
+Каждый модуль команды — изолированная папка с `init.ts` (экспортирует `CommandModule`) и файлом логики. Новая команда добавляется без правки реестра — папка подхватывается автоматически.
+
+---
+
+## База данных
+
+Локальная SQLite-база `userbot.db` (не попадает в git). Схема управляется через Drizzle ORM.
+
+### Таблицы
+
+**`messages`** — все входящие и исходящие сообщения:
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `message_id` | integer | ID сообщения в Telegram |
+| `chat_id` | text | ID чата |
+| `sender_id` | text | ID отправителя |
+| `text` | text | Текст сообщения |
+| `is_outgoing` | boolean | Исходящее (`true`) или входящее |
+| `timestamp` | integer | Unix ms |
+
+Индекс: `(chat_id, timestamp)`
+
+**`llm_calls`** — история вызовов нейросети:
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `provider` | text | `gemini` или `cerebras` |
+| `prompt` | text | Полный промпт |
+| `response` | text | Ответ модели (null при ошибке) |
+| `latency_ms` | integer | Время ответа, мс |
+| `error` | text | Сообщение об ошибке (null при успехе) |
+| `timestamp` | integer | Unix ms |
+
+**`event_log`** — системные события:
+
+| Колонка | Тип | Описание |
+|---|---|---|
+| `event_type` | text | `bot_start`, `command_start`, `command_error`, `provider_changed`, … |
+| `level` | text | `info` / `warn` / `error` |
+| `message` | text | Описание события |
+| `metadata` | text | JSON с дополнительными данными |
+| `timestamp` | integer | Unix ms |
+
+### Запись
+
+Записи **буферизуются в памяти** и сбрасываются на диск пакетными транзакциями (batch insert):
+- при накоплении ≥ 50 записей
+- по таймеру раз в секунду
+- при завершении процесса (`SIGINT`, `SIGTERM`, `exit`)
+
+### Миграции
+
+При изменении схемы:
+
+```bash
+# Сгенерировать миграцию из изменений в schema.ts
+bunx drizzle-kit generate
+
+# Коммитим SQL-файл; при следующем bun start он применится автоматически
+git add src/core/db/migrations/
+```
+
+Миграции применяются автоматически при старте бота через `migrate()`.
+
+### Запросы для TUI / аналитики
+
+```ts
+import { db } from "./src/core/db/client";
+import { messages, llmCalls } from "./src/core/db/schema";
+import { eq, desc } from "drizzle-orm";
+
+// Последние 50 сообщений из чата
+db.select()
+  .from(messages)
+  .where(eq(messages.chatId, "-100123456789"))
+  .orderBy(desc(messages.timestamp))
+  .limit(50)
+  .all();
+
+// Все неудачные вызовы LLM
+db.select()
+  .from(llmCalls)
+  .where(eq(llmCalls.error, null))
+  .all();
+```
+
+---
+
+## Технические детали
+
+### Производительность записи
+
+SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchronous = NORMAL` — это даёт параллельное чтение/запись без блокировок и высокую пропускную способность без риска потери данных при штатном завершении.
+
+### Очередь команд
+
+`onNewMessage` выстраивает команды в последовательную цепочку Promise (`commandQueue`). Это исключает гонку при параллельном получении нескольких команд подряд.
+
+### Таймаут LLM
+
+Все запросы к LLM ограничены 45 секундами через `AbortController`. При таймауте бот отправляет сообщение об ошибке в чат и продолжает работу.
+
+### Устойчивость к сбоям
+
+- `unhandledRejection` и `uncaughtException` перехватываются и логируются в БД, процесс не падает
+- Буфер БД откатывается при ошибке транзакции, данные не теряются
+
+---
+
+## Переменные окружения
+
+| Переменная | Обязательна | По умолчанию | Описание |
+|---|---|---|---|
+| `TG_API_ID` | ✓ | — | Telegram App ID |
+| `TG_API_HASH` | ✓ | — | Telegram App Hash |
+| `TG_SESSION` | — | `""` | Сохранённая сессия (заполняется после первого входа) |
+| `LLM_PROVIDER` | — | `gemini` | Провайдер по умолчанию: `gemini` или `cerebras` |
+| `GEMINI_API_KEY` | если `gemini` | — | Ключ Google AI Studio |
+| `GEMINI_MODEL` | — | `gemini-2.0-flash` | Модель Gemini |
+| `CEREBRAS_API_KEY` | если `cerebras` | — | Ключ Cerebras |
+| `CEREBRAS_MODEL` | — | `gpt-oss-120b` | Модель Cerebras |
+| `SYSTEM_PROMPT` | — | `""` | Системный промпт для всех `!answer`-запросов |
+| `DB_PATH` | — | `./userbot.db` | Путь к SQLite-базе |
+
+---
 
 ## Возможные проблемы
 
-- Ошибка авторизации - проверить `TG_API_ID` и `TG_API_HASH`
-- Ошибка от Gemini API - проверить `GEMINI_API_KEY` и лимиты запросов в Google AI Studio
-- Юзербот не реагирует на команду - убедиться, что команда отправлена с твоего аккаунта, а не от другого пользователя в чате
+**Бот не реагирует на команду**
+— Убедись, что команда отправлена с твоего аккаунта (не от другого пользователя).
+— Убедись, что текст начинается с `!` без пробела перед ним.
+
+**Ошибка авторизации**
+— Проверь `TG_API_ID` и `TG_API_HASH` на [my.telegram.org](https://my.telegram.org).
+— Если сессия протухла — очисти `TG_SESSION` в `.env` и переавторизуйся.
+
+**Ошибка от Gemini / Cerebras**
+— Проверь API-ключ и лимиты запросов.
+— При таймауте (>45 с) бот сам сообщит об ошибке в чат.
+
+**`LLM_PROVIDER=gemini` но `GEMINI_API_KEY` не задан**
+— Бот не запустится, выдаст ошибку при старте — это намеренно.
