@@ -12,7 +12,7 @@ export interface TuiConfig {
 }
 
 const DEFAULT_CONFIG: TuiConfig = {
-  visiblePanels: ["status", "eventLog", "commandQueue"]
+  visiblePanels: ["status", "messages", "llmCalls", "eventLog", "commandQueue"]
 };
 
 export function loadTuiConfig(): TuiConfig {

@@ -3,13 +3,15 @@ import { sqliteTable, integer, text, index } from "drizzle-orm/sqlite-core";
 export const messages = sqliteTable(
   "messages",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    messageId: integer("message_id").notNull(),
-    chatId: text("chat_id").notNull(),
-    senderId: text("sender_id"),
-    text: text("text"),
-    timestamp: integer("timestamp").notNull(),
+    id:         integer("id").primaryKey({ autoIncrement: true }),
+    messageId:  integer("message_id").notNull(),
+    chatId:     text("chat_id").notNull(),
+    senderId:   text("sender_id"),
+    text:       text("text"),
+    timestamp:  integer("timestamp").notNull(),
     isOutgoing: integer("is_outgoing", { mode: "boolean" }).notNull(),
+    chatTitle:  text("chat_title"),   // denormalized: resolved at log time
+    senderName: text("sender_name"),  // denormalized: resolved at log time
   },
   (t) => [index("idx_messages_chat_timestamp").on(t.chatId, t.timestamp)]
 );

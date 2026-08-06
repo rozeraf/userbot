@@ -243,11 +243,11 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
 
       {/* Column headers */}
       <Box paddingX={1}>
-        <Box width={3}><Text color="gray" bold>ST</Text></Box>
-        <Box width={9}><Text color="gray" bold>TIME</Text></Box>
-        <Box width={12}><Text color="gray" bold>COMMAND</Text></Box>
-        <Box width={9}><Text color="gray" bold>CHAT</Text></Box>
-        <Box width={7}><Text color="gray" bold>DUR</Text></Box>
+        <Box width={3}  flexShrink={0}><Text color="gray" bold>ST</Text></Box>
+        <Box width={9}  flexShrink={0}><Text color="gray" bold>TIME</Text></Box>
+        <Box width={12} flexShrink={0}><Text color="gray" bold>COMMAND</Text></Box>
+        <Box width={9}  flexShrink={0}><Text color="gray" bold>CHAT</Text></Box>
+        <Box width={7}  flexShrink={0}><Text color="gray" bold>DUR</Text></Box>
         <Text color="gray" bold>INPUT</Text>
       </Box>
 
@@ -271,19 +271,19 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
 
             return (
               <Box key={entry.correlationId} backgroundColor={isSelected ? "gray" : undefined}>
-                <Box width={3}>
+                <Box width={3}  flexShrink={0}>
                   <Text color={isSelected ? "black" : sColor}>{icon}</Text>
                 </Box>
-                <Box width={9}>
+                <Box width={9}  flexShrink={0}>
                   <Text color={isSelected ? "black" : "gray"}>{formatTime(entry.startTs)}</Text>
                 </Box>
-                <Box width={12}>
+                <Box width={12} flexShrink={0}>
                   <Text color={isSelected ? "black" : "white"}>{entry.commandName.slice(0,11)}</Text>
                 </Box>
-                <Box width={9}>
+                <Box width={9}  flexShrink={0}>
                   <Text color={isSelected ? "black" : "cyan"}>{chat}</Text>
                 </Box>
-                <Box width={7}>
+                <Box width={7}  flexShrink={0}>
                   <Text color={isSelected ? "black" : sColor}>{dur}</Text>
                 </Box>
                 <Text

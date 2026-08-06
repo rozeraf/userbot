@@ -1,0 +1,36 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "a3f8c2d1-9b4e-4a7f-8e6d-12345abcde99",
+  "prevId": "d4d70eff-7eee-44d0-aab4-ba011e76dc93",
+  "tables": {
+    "messages": {
+      "name": "messages",
+      "columns": {
+        "id":          { "name": "id",          "type": "integer", "primaryKey": true,  "notNull": true, "autoincrement": true },
+        "message_id":  { "name": "message_id",  "type": "integer", "primaryKey": false, "notNull": true },
+        "chat_id":     { "name": "chat_id",     "type": "text",    "primaryKey": false, "notNull": true },
+        "sender_id":   { "name": "sender_id",   "type": "text",    "primaryKey": false, "notNull": false },
+        "text":        { "name": "text",        "type": "text",    "primaryKey": false, "notNull": false },
+        "timestamp":   { "name": "timestamp",   "type": "integer", "primaryKey": false, "notNull": true },
+        "is_outgoing": { "name": "is_outgoing", "type": "integer", "primaryKey": false, "notNull": true },
+        "chat_title":  { "name": "chat_title",  "type": "text",    "primaryKey": false, "notNull": false },
+        "sender_name": { "name": "sender_name", "type": "text",    "primaryKey": false, "notNull": false }
+      },
+      "indexes": {
+        "idx_messages_chat_timestamp": {
+          "name": "idx_messages_chat_timestamp",
+          "columns": ["chat_id", "timestamp"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "enums": {},
+  "views": {},
+  "_meta": { "columns": {}, "schemas": {}, "tables": {} }
+}
