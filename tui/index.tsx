@@ -217,7 +217,7 @@ function TuiApp() {
       {/* ── Footer ── */}
       <Box borderStyle="single" borderColor="gray" paddingX={2} marginTop={1} justifyContent="space-between">
         {logFocused
-          ? <Text color="yellow">Log focus: [s]SYS [c]CLI [r]SRV [l]LLM [e]ERR | ↑↓ scroll | [f] freeze | [Tab] back</Text>
+          ? <Text color="yellow">Log: [s/c/r/l/e] filter | ↑↓ cursor | [x] export | [X] batch | [!] errors | [f] freeze | [Tab] back</Text>
           : <Text color="gray">Toggle: [1] Status | [2] Messages | [3] LLM | [4] Events | [Tab] log focus</Text>
         }
         <Text color="red" bold>Press [q] to Quit</Text>
