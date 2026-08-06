@@ -6,7 +6,7 @@ function nowMs(): number {
 
 export const remindCommand: CommandModule = {
   name: "remind",
-  match: (text) => text.startsWith("!remind"),
+  match: (text) => text === "!remind" || text.startsWith("!remind "),
   async run({ client, message, text }) {
     const t0 = nowMs();
 

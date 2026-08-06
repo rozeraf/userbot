@@ -123,7 +123,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
           .select()
           .from(messages)
           .where(eq(messages.chatId, selectedChat.chatId))
-          .orderBy(asc(messages.id))
+          .orderBy(desc(messages.id))
+          .limit(300)
           .all();
 
         if (!active) return;
@@ -137,7 +138,7 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
           timestamp:  r.timestamp,
           isOutgoing: r.isOutgoing,
           chatTitle:  r.chatTitle ?? null,
-        })));
+        })).reverse());
       } catch { /* ignore */ }
     };
 

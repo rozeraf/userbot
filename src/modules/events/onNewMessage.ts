@@ -22,94 +22,108 @@ function resolveEntityName(entity: any): string | undefined {
   return undefined;
 }
 
+// Sequential queue to guarantee command execution order exactly matching arrival order
 let commandQueue = Promise.resolve();
 
-export async function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
+export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   const message = event.message;
   if (!message) return;
 
   const text = normalizeText(message.text ?? "");
   const chatId = message.chatId?.toString() ?? "";
   const senderId = message.senderId?.toString() ?? "";
+  const isOutgoing = message.out ?? false;
 
-  // ── Resolve human-readable names (best-effort, non-blocking) ───────────────
-  let chatTitle: string | undefined;
-  let senderName: string | undefined;
+  // ── Resolve names in parallel immediately upon arrival ──────────────────────
+  const chatPromise = message.getChat()
+    .then(resolveEntityName)
+    .catch(() => undefined);
 
-  try {
-    const chat = await message.getChat();
-    chatTitle = resolveEntityName(chat);
-  } catch { /* ignore — don't block logging on network failure */ }
+  const senderPromise = (!isOutgoing)
+    ? message.getSender().then(resolveEntityName).catch(() => undefined)
+    : Promise.resolve(undefined);
 
-  // For outgoing messages we ARE the sender — skip sender resolution
-  if (!message.out) {
-    try {
-      const sender = await message.getSender();
-      senderName = resolveEntityName(sender);
-    } catch { /* ignore */ }
+  // Synchronously determine if this is a command to lock its order in the queue
+  let matchedCmd: typeof COMMANDS[number] | undefined;
+  if (isOutgoing && text.startsWith("!")) {
+    matchedCmd = COMMANDS.find((c) => c.match(text));
   }
 
-  // Log all messages (incoming and outgoing) with resolved names
-  database.logMessage({
-    messageId:  message.id,
-    chatId,
-    senderId,
-    text,
-    isOutgoing: message.out ?? false,
-    chatTitle:  chatTitle ?? null,
-    senderName: senderName ?? null,
-  });
-
-  if (!message.out) return;
-  if (!text.startsWith("!")) return;
-
-  console.log("[event] new message:", {
-    chatId,
-    chatTitle,
-    out: message.out,
-    text: text.slice(0, 180),
-  });
-
-  for (const command of COMMANDS) {
-    if (!command.match(text)) continue;
-
-    // Queue command execution sequentially
+  if (matchedCmd) {
+    const cmd = matchedCmd;
+    // Chain command execution synchronously to secure the execution sequence slot
     commandQueue = commandQueue.then(async () => {
-      // Unique ID to correlate start → success/error in TUI
+      // 1. Wait for name resolution (which started in parallel when message arrived)
+      const chatTitle = await chatPromise;
+      const senderName = await senderPromise;
+
+      // 2. Log the command message to the DB (guarantees command message is logged before execution logs)
+      database.logMessage({
+        messageId:  message.id,
+        chatId,
+        senderId,
+        text,
+        isOutgoing: true,
+        chatTitle:  chatTitle ?? null,
+        senderName: senderName ?? null,
+      });
+
+      console.log("[event] executing queued command:", {
+        chatId,
+        chatTitle,
+        text: text.slice(0, 180),
+      });
+
       const correlationId = randomBytes(6).toString("hex");
 
       try {
-        database.setQueueState(`executing: ${command.name}`);
+        database.setQueueState(`executing: ${cmd.name}`);
         database.logEvent({
           eventType: "command_start",
           level: "info",
           category: "client",
-          message: `Executing command: ${command.name}`,
-          metadata: { chatId, chatTitle, text, correlationId, commandName: command.name },
+          message: `Executing command: ${cmd.name}`,
+          metadata: { chatId, chatTitle, text, correlationId, commandName: cmd.name },
         });
 
-        await command.run({ client, message, text });
+        await cmd.run({ client, message, text });
 
         database.setQueueState("idle");
         database.logEvent({
           eventType: "command_success",
           level: "info",
           category: "client",
-          message: `Successfully executed command: ${command.name}`,
-          metadata: { chatId, correlationId, commandName: command.name },
+          message: `Successfully executed command: ${cmd.name}`,
+          metadata: { chatId, correlationId, commandName: cmd.name },
         });
       } catch (err: any) {
-        console.error(`[event] Error executing command "${command.name}":`, err);
+        console.error(`[event] Error executing command "${cmd.name}":`, err);
         database.setQueueState("idle");
         database.logEvent({
           eventType: "command_error",
           level: "error",
           category: "error",
-          message: `Error executing command "${command.name}": ${err.message || String(err)}`,
-          metadata: { chatId, correlationId, commandName: command.name, error: String(err) },
+          message: `Error executing command "${cmd.name}": ${err.message || String(err)}`,
+          metadata: { chatId, correlationId, commandName: cmd.name, error: String(err) },
         });
       }
     });
-    return;
+  } else {
+    // Non-command message: log asynchronously as soon as names are resolved, without blocking the queue
+    Promise.all([chatPromise, senderPromise])
+      .then(([chatTitle, senderName]) => {
+        database.logMessage({
+          messageId:  message.id,
+          chatId,
+          senderId,
+          text,
+          isOutgoing,
+          chatTitle:  chatTitle ?? null,
+          senderName: senderName ?? null,
+        });
+      })
+      .catch((err) => {
+        console.error("[event] failed to resolve entities for message logging:", err);
+      });
   }
 }

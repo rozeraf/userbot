@@ -37,8 +37,6 @@ function tryOpenDb() {
 
   try {
     const sqlite = new Database(DB_PATH, { readonly: true });
-    // WAL checkpoint: allow readers to see committed writes immediately
-    sqlite.run("PRAGMA journal_mode = WAL;");
     sqlite.run("PRAGMA busy_timeout = 1000;"); // wait up to 1s on lock
     _db = drizzle(sqlite, { schema });
     _dbReady = true;

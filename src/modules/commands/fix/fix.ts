@@ -8,7 +8,7 @@ function nowMs(): number {
 
 export const fixCommand: CommandModule = {
   name: "fix",
-  match: (text) => text.startsWith("!fix"),
+  match: (text) => text === "!fix" || text.startsWith("!fix "),
   async run({ client, message, text }) {
     const t0 = nowMs();
 

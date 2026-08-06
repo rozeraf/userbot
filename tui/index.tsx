@@ -153,11 +153,6 @@ function TuiApp() {
     }
   );
 
-  // ── DB not ready: show waiting screen ─────────────────────────────────────────────
-  if (!isDbReady()) {
-    return <WaitingScreen width={termCols} height={termRows} />;
-  }
-
   const uptimeMs  = data.connectedSince ? (now - data.connectedSince) : null;
   const uptimeStr = (data.status === "disconnected" || data.status === "error" || data.status === "loading" || data.status === "waiting")
     ? "N/A"
@@ -222,6 +217,10 @@ function TuiApp() {
     logFocused   ? "LOG [Tab→]"   :
     queueFocused ? "QUEUE [Tab→]" :
     "MAIN [Tab→]";
+
+  if (!isDbReady()) {
+    return <WaitingScreen width={termCols} height={termRows} />;
+  }
 
   return (
     <Box flexDirection="column" width={termCols} height={termRows} paddingX={1} overflow="hidden">
