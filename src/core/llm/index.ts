@@ -3,6 +3,7 @@ import { state } from "../state";
 import { askCerebras } from "./cerebras";
 import { askGemini } from "./gemini";
 import { database } from "../db";
+import { errorMessage } from "../errors";
 
 export async function askByProvider(provider: Provider, prompt: string, systemPrompt?: string): Promise<string> {
   console.log("[llm] activeProvider:", provider);
@@ -27,20 +28,20 @@ export async function askByProvider(provider: Provider, prompt: string, systemPr
       message: `LLM request to ${provider} succeeded in ${latencyMs}ms`,
     });
     return response;
-  } catch (err: any) {
+  } catch (err: unknown) {
     const latencyMs = Date.now() - t0;
     database.logLLMCall({
       provider,
       prompt,
       response: null,
       latencyMs,
-      error: err.message || String(err)
+      error: errorMessage(err)
     });
     database.logEvent({
       eventType: "llm_error",
       level: "error",
       category: "llm",
-      message: `LLM request to ${provider} failed: ${err.message || String(err)}`,
+      message: `LLM request to ${provider} failed: ${errorMessage(err)}`,
     });
     throw err;
   }

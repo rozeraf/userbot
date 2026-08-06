@@ -1,10 +1,10 @@
-import { db } from "./client";
+import { closeDb, db } from "./client";
 import { messages, llmCalls, eventLog, statusSnapshot } from "./schema";
 import type { NewMessage, NewLLMCall, NewEvent } from "./schema";
 import { state } from "../state";
-import { eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 
-// Re-export db and schema for TUI / external consumers
+// Re-export the write-side database API for bot-only consumers.
 export { db } from "./client";
 export * from "./schema";
 
@@ -26,6 +26,8 @@ let eventLogBuffer: NewEvent[]   = [];
 
 const FLUSH_INTERVAL_MS = 1000; // periodic flush and status snapshot tick every 1 s
 const MAX_BUFFER_SIZE  = 50;
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+let isClosed = false;
 
 // ── In-Memory Counters & Status ───────────────────────────────────────────────
 
@@ -64,7 +66,7 @@ try {
     .all()[0];
   const errorEvents = db.select({ count: sql<number>`count(*)` })
     .from(eventLog)
-    .where(eq(eventLog.level, "error"))
+    .where(and(eq(eventLog.level, "error"), ne(eventLog.category, "llm")))
     .all()[0];
   
   errorCount = (errorLlm?.count ?? 0) + (errorEvents?.count ?? 0);
@@ -75,8 +77,22 @@ try {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const database = {
+  start() {
+    if (isClosed) throw new Error("Cannot start a closed database");
+    if (tickInterval) return;
+    tickInterval = setInterval(() => {
+      database.flush();
+      database.updateSnapshot();
+    }, FLUSH_INTERVAL_MS);
+  },
+
   setStatus(status: "active" | "connecting" | "disconnected") {
     botStatus = status;
+    if (status === "disconnected") {
+      connectedSince = null;
+      pingMs = null;
+      return;
+    }
     if (status === "active" && !connectedSince) {
       connectedSince = Date.now();
     }
@@ -112,7 +128,8 @@ export const database = {
   },
 
   logEvent(event: PendingEvent) {
-    if (event.level === "error" || event.category === "error") {
+    // LLM failures already increment the counter in logLLMCall().
+    if (event.level === "error" && event.category !== "llm") {
       errorCount++;
     }
 
@@ -188,9 +205,15 @@ export const database = {
   },
 
   close() {
-    clearInterval(tickInterval);
+    if (isClosed) return;
+    isClosed = true;
+    if (tickInterval) {
+      clearInterval(tickInterval);
+      tickInterval = null;
+    }
     this.flush();
     this.updateSnapshot();
+    closeDb();
   },
 };
 
@@ -202,28 +225,3 @@ function checkFlush() {
     database.flush();
   }
 }
-
-// Start a permanent interval for periodic flushes and status snapshot updates
-const tickInterval = setInterval(() => {
-  database.flush();
-  database.updateSnapshot();
-}, FLUSH_INTERVAL_MS);
-
-// ── Graceful shutdown ─────────────────────────────────────────────────────────
-
-process.on("beforeExit", () => {
-  database.flush();
-  database.updateSnapshot();
-});
-process.on("exit", () => {
-  database.flush();
-  database.updateSnapshot();
-});
-
-const onSignal = () => {
-  database.flush();
-  database.updateSnapshot();
-  process.exit(0);
-};
-process.on("SIGINT",  onSignal);
-process.on("SIGTERM", onSignal);

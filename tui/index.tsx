@@ -3,9 +3,9 @@ import { render, Box, Text, useInput, useApp, useStdout } from "ink";
 import { loadTuiConfig, saveTuiConfig } from "./core/config";
 import type { PanelName } from "./core/config";
 import { usePoll } from "./core/usePoll";
-import { isDbReady, getDb, messages, llmCalls, eventLog, statusSnapshot } from "./core/db";
+import { isDbReady } from "./core/db";
 import { POLL_SNAPSHOT_MS } from "./core/constants";
-import { sql } from "drizzle-orm";
+import { loadStatusSnapshot } from "./data/queries";
 import { EventLogPanel }     from "./panels/EventLogPanel";
 import { CommandQueuePanel } from "./panels/CommandQueuePanel";
 import { MessagesPanel }     from "./panels/MessagesPanel";
@@ -107,42 +107,30 @@ function TuiApp() {
 
   const data = usePoll<StatusData>(
     async () => {
-      const db = getDb();
-      if (!db) return {
+      const result = loadStatusSnapshot();
+      if (!result) return {
         messages: 0, llmCalls: 0, events: 0,
         status: "waiting", provider: "N/A", connectedSince: null,
         pingMs: null, incomingCount: 0, outgoingCount: 0, aiRequestCount: 0,
         errorCount: 0, queueState: "waiting", memoryMb: 0, updatedAt: null, isStale: true,
       };
-      try {
-        const msgCount = db.select({ count: sql<number>`count(*)` }).from(messages).all()[0]?.count ?? 0;
-        const llmCount = db.select({ count: sql<number>`count(*)` }).from(llmCalls).all()[0]?.count ?? 0;
-        const evCount  = db.select({ count: sql<number>`count(*)` }).from(eventLog).all()[0]?.count ?? 0;
-        const snapshot = db.select().from(statusSnapshot).where(sql`id = 1`).all()[0];
-        const isStale  = snapshot ? (Date.now() - snapshot.updatedAt > 3000) : true;
-        return {
-          messages: msgCount, llmCalls: llmCount, events: evCount,
-          status:         isStale ? "disconnected" : (snapshot?.status ?? "unknown"),
-          provider:       snapshot?.provider ?? "N/A",
-          connectedSince: snapshot?.connectedSince ?? null,
-          pingMs:         isStale ? null : (snapshot?.pingMs ?? null),
-          incomingCount:  snapshot?.incomingCount ?? 0,
-          outgoingCount:  snapshot?.outgoingCount ?? 0,
-          aiRequestCount: snapshot?.aiRequestCount ?? 0,
-          errorCount:     snapshot?.errorCount ?? 0,
-          queueState:     isStale ? "offline" : (snapshot?.queueState ?? "unknown"),
-          memoryMb:       snapshot?.memoryMb ?? 0,
-          updatedAt:      snapshot?.updatedAt ?? null,
-          isStale,
-        };
-      } catch {
-        return {
-          messages: 0, llmCalls: 0, events: 0,
-          status: "error", provider: "N/A", connectedSince: null,
-          pingMs: null, incomingCount: 0, outgoingCount: 0, aiRequestCount: 0,
-          errorCount: 0, queueState: "offline", memoryMb: 0, updatedAt: null, isStale: true,
-        };
-      }
+      const { messagesCount, llmCallsCount, eventsCount, snapshot } = result;
+      const isStale = snapshot ? (Date.now() - snapshot.updatedAt > 3000) : true;
+      return {
+        messages: messagesCount, llmCalls: llmCallsCount, events: eventsCount,
+        status: isStale ? "disconnected" : (snapshot?.status ?? "unknown"),
+        provider: snapshot?.provider ?? "N/A",
+        connectedSince: snapshot?.connectedSince ?? null,
+        pingMs: isStale ? null : (snapshot?.pingMs ?? null),
+        incomingCount: snapshot?.incomingCount ?? 0,
+        outgoingCount: snapshot?.outgoingCount ?? 0,
+        aiRequestCount: snapshot?.aiRequestCount ?? 0,
+        errorCount: snapshot?.errorCount ?? 0,
+        queueState: isStale ? "offline" : (snapshot?.queueState ?? "unknown"),
+        memoryMb: snapshot?.memoryMb ?? 0,
+        updatedAt: snapshot?.updatedAt ?? null,
+        isStale,
+      };
     },
     POLL_SNAPSHOT_MS,
     {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { getDb, llmCalls } from "../core/db";
-import { desc, asc, isNotNull, eq, or, isNull } from "drizzle-orm";
+import { loadRecentLlmCalls } from "../data/queries";
 import { writeFileSync } from "fs";
 import { POLL_LLMCALLS_MS } from "../core/constants";
 
@@ -130,16 +129,8 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
     let active = true;
 
     const fetch = () => {
-      const db = getDb();
-      if (!db) return;
-      try {
-        const rows = db
-          .select()
-          .from(llmCalls)
-          .orderBy(desc(llmCalls.id))
-          .limit(500)
-          .all();
-        if (!active) return;
+      const rows = loadRecentLlmCalls();
+      if (active && rows) {
         setBuffer(rows.map((r) => ({
           id:        r.id,
           provider:  r.provider,
@@ -149,7 +140,7 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
           error:     r.error ?? null,
           timestamp: r.timestamp,
         })));
-      } catch { /* ignore database lock or missing tables */ }
+      }
     };
 
     fetch();

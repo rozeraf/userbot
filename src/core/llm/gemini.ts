@@ -1,5 +1,6 @@
 import { ENV } from "../../config/env";
 import { normalizeText } from "./prompt";
+import { errorMessage } from "../errors";
 
 interface GeminiResponse {
   candidates?: {
@@ -66,11 +67,11 @@ export async function askGemini(prompt: string, systemPrompt?: string): Promise<
 
     console.log("[gemini] response ok, totalMs:", nowMs() - t0);
     return normalizeText(text);
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Gemini API request timed out (45s)");
     }
-    throw err;
+    throw new Error(errorMessage(err), { cause: err });
   } finally {
     clearTimeout(timeoutId);
   }

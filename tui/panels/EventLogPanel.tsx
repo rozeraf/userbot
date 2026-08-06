@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { getDb, eventLog } from "../core/db";
-import { gt, asc, eq, desc } from "drizzle-orm";
+import { loadErrorEvents, loadEventsAfter } from "../data/queries";
 import { writeFileSync } from "fs";
 import { POLL_EVENTLOG_MS } from "../core/constants";
 
@@ -156,18 +155,8 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetchLive = () => {
-      const db = getDb();
-      if (!db) return;
-      try {
-        const rows = db
-          .select()
-          .from(eventLog)
-          .where(gt(eventLog.id, lastIdRef.current))
-          .orderBy(asc(eventLog.id))
-          .limit(200)
-          .all();
-
-        if (!active || rows.length === 0) return;
+      const rows = loadEventsAfter(lastIdRef.current);
+      if (!active || !rows || rows.length === 0) return;
         lastIdRef.current = rows[rows.length - 1]!.id;
 
         setBuffer((prev) => {
@@ -185,7 +174,6 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
           ];
           return next.length > MAX_BUFFER ? next.slice(next.length - MAX_BUFFER) : next;
         });
-      } catch { /* ignore DB errors */ }
     };
 
     fetchLive();
@@ -200,18 +188,8 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetchErrors = () => {
-      const db = getDb();
-      if (!db) return;
-      try {
-        const rows = db
-          .select()
-          .from(eventLog)
-          .where(eq(eventLog.category, "error"))
-          .orderBy(desc(eventLog.id))
-          .limit(errorLimit)
-          .all();
-
-        if (!active) return;
+      const rows = loadErrorEvents(errorLimit);
+      if (!active || !rows) return;
 
         setErrorEntries(
           rows.map((r) => ({
@@ -224,7 +202,6 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
             timestamp: r.timestamp,
           })).reverse() // show oldest-first in display
         );
-      } catch { /* ignore */ }
     };
 
     fetchErrors();

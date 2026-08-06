@@ -13,8 +13,8 @@ const provider: Provider = rawProvider === "cerebras" ? "cerebras" : "gemini";
 
 const tgApiIdRaw = required("TG_API_ID");
 const tgApiId = Number(tgApiIdRaw);
-if (isNaN(tgApiId) || !Number.isFinite(tgApiId)) {
-  throw new Error(`Invalid TG_API_ID: "${tgApiIdRaw}" must be a valid number`);
+if (!Number.isInteger(tgApiId) || tgApiId <= 0) {
+  throw new Error(`Invalid TG_API_ID: "${tgApiIdRaw}" must be a positive integer`);
 }
 
 const geminiApiKey = process.env.GEMINI_API_KEY?.trim() ?? "";

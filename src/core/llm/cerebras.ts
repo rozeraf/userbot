@@ -1,5 +1,6 @@
 import { ENV } from "../../config/env";
 import { normalizeText } from "./prompt";
+import { errorMessage } from "../errors";
 
 interface CerebrasChatResponse {
   choices?: {
@@ -64,11 +65,11 @@ export async function askCerebras(prompt: string, systemPrompt?: string): Promis
 
     console.log("[cerebras] response ok, totalMs:", nowMs() - t0);
     return normalizeText(text);
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Cerebras API request timed out (45s)");
     }
-    throw err;
+    throw new Error(errorMessage(err), { cause: err });
   } finally {
     clearTimeout(timeoutId);
   }

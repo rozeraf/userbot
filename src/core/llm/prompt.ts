@@ -12,5 +12,8 @@ export function normalizeText(text: string): string {
 }
 
 export function preview(text: string, len = 120): string {
-  return text.length > len ? `${text.slice(0, len)}...` : text;
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)];
+  return graphemes.length > len
+    ? `${graphemes.slice(0, len).map(({ segment }) => segment).join("")}...`
+    : text;
 }

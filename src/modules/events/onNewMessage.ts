@@ -4,13 +4,14 @@ import { Api } from "telegram";
 import { COMMANDS } from "../commands";
 import { database } from "../../core/db";
 import { randomBytes } from "crypto";
+import { errorMessage } from "../../core/errors";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
 }
 
 /** Resolve a human-readable name from any GramJS entity type */
-function resolveEntityName(entity: any): string | undefined {
+function resolveEntityName(entity: unknown): string | undefined {
   if (!entity) return undefined;
   if (entity instanceof Api.Channel || entity instanceof Api.Chat) {
     return entity.title || undefined;
@@ -52,7 +53,11 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   if (matchedCmd) {
     const cmd = matchedCmd;
     // Chain command execution synchronously to secure the execution sequence slot
-    commandQueue = commandQueue.then(async () => {
+    commandQueue = commandQueue
+      .catch((err: unknown) => {
+        console.error("[event] Recovered command queue after an unexpected failure:", err);
+      })
+      .then(async () => {
       // 1. Wait for name resolution (which started in parallel when message arrived)
       const chatTitle = await chatPromise;
       const senderName = await senderPromise;
@@ -74,9 +79,9 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
         text: text.slice(0, 180),
       });
 
-      const correlationId = randomBytes(6).toString("hex");
-
+      let correlationId: string | undefined;
       try {
+        correlationId = randomBytes(6).toString("hex");
         database.setQueueState(`executing: ${cmd.name}`);
         database.logEvent({
           eventType: "command_start",
@@ -88,7 +93,6 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
 
         await cmd.run({ client, message, text });
 
-        database.setQueueState("idle");
         database.logEvent({
           eventType: "command_success",
           level: "info",
@@ -96,18 +100,19 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
           message: `Successfully executed command: ${cmd.name}`,
           metadata: { chatId, correlationId, commandName: cmd.name },
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[event] Error executing command "${cmd.name}":`, err);
-        database.setQueueState("idle");
         database.logEvent({
           eventType: "command_error",
           level: "error",
           category: "error",
-          message: `Error executing command "${cmd.name}": ${err.message || String(err)}`,
-          metadata: { chatId, correlationId, commandName: cmd.name, error: String(err) },
+          message: `Error executing command "${cmd.name}": ${errorMessage(err)}`,
+          metadata: { chatId, correlationId, commandName: cmd.name, error: errorMessage(err) },
         });
+      } finally {
+        database.setQueueState("idle");
       }
-    });
+      });
   } else {
     // Non-command message: log asynchronously as soon as names are resolved, without blocking the queue
     Promise.all([chatPromise, senderPromise])

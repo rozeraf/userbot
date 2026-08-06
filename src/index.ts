@@ -7,6 +7,20 @@ import { ENV } from "./config/env";
 import { onNewMessage } from "./modules/events/onNewMessage";
 import { database } from "./core/db";
 
+let isShuttingDown = false;
+
+function shutdown(exitCode = 0) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  database.setStatus("disconnected");
+  database.close();
+  process.exit(exitCode);
+}
+
+process.on("SIGINT", () => shutdown(0));
+process.on("SIGTERM", () => shutdown(0));
+process.on("beforeExit", () => database.close());
+
 // Global process error catchers to prevent bot crashes on network failures
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
@@ -32,6 +46,7 @@ process.on("uncaughtException", (error) => {
 });
 
 async function main() {
+  database.start();
   database.setStatus("connecting");
   database.logEvent({
     eventType: "bot_start",
@@ -116,7 +131,7 @@ async function main() {
       console.log(client.session.save());
     } catch (err) {
       console.error("[tg] auth error:", err);
-      process.exit(1);
+      shutdown(1);
     }
   }
 
@@ -170,5 +185,5 @@ main().catch((err) => {
     metadata: { stack: err.stack },
   });
   database.flush();
-  process.exit(1);
+  shutdown(1);
 });

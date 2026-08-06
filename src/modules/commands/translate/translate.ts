@@ -1,17 +1,11 @@
-import { askCurrent } from "../../../core/llm";
 import { preview } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
-
-function nowMs(): number {
-  return Date.now();
-}
+import { executeLlmReply } from "../llmReply";
 
 export const translateCommand: CommandModule = {
   name: "translate",
   match: (text) => text === "!translate" || text.startsWith("!translate "),
   async run({ client, message, text }) {
-    const t0 = nowMs();
-
     const userInput = text.slice("!translate".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -60,44 +54,11 @@ ${userInput}
 
     console.log("[translate] prompt preview:", preview(prompt, 220));
 
-    try {
-      const t1 = nowMs();
-      const answer = await askCurrent(prompt, systemInstruction);
-      console.log("[translate] model done inMs:", nowMs() - t1);
-      console.log("[translate] answer preview:", preview(answer, 200));
-
-      const replyToId = replied?.id;
-      console.log("[translate] sending reply", {
-        replyToId,
-        chatId: message.chatId?.toString?.(),
-      });
-
-      const sendStart = nowMs();
-      try {
-        await client.sendMessage(message.chatId!, {
-          message: answer,
-          ...(replyToId ? { replyTo: replyToId } : {}),
-        });
-      } catch (sendErr) {
-        console.error("[translate] telegram send message error:", sendErr);
-        try {
-          await message.reply({ message: "Ошибка при отправке ответа перевода в Telegram." });
-        } catch (replyErr) {
-          console.error("[translate] failed to send telegram error reply:", replyErr);
-        }
-      }
-
-      console.log("[translate] telegram send done inMs:", nowMs() - sendStart);
-      console.log("[translate] total elapsed inMs:", nowMs() - t0);
-      return true;
-    } catch (err) {
-      console.error("[translate] error:", err);
-      try {
-        await message.reply({ message: "Ошибка при переводе, смотри логи." });
-      } catch (replyErr) {
-        console.error("[translate] failed to send error reply:", replyErr);
-      }
-      throw err;
-    }
+    await executeLlmReply({
+      client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "translate",
+      sendErrorMessage: "Ошибка при отправке ответа перевода в Telegram.",
+      llmErrorMessage: "Ошибка при переводе, смотри логи.",
+    });
+    return true;
   },
 };

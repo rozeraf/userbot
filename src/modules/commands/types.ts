@@ -1,8 +1,8 @@
-import type { TelegramClient } from "telegram";
+import { Api, type TelegramClient } from "telegram";
 
 export type CommandContext = {
   client: TelegramClient;
-  message: any;
+  message: Api.Message;
   text: string;
 };
 

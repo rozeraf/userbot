@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { getDb, eventLog } from "../core/db";
-import { like, desc } from "drizzle-orm";
+import { loadCommandEvents } from "../data/queries";
 import { POLL_CMDQUEUE_MS } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -173,26 +172,8 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetch = () => {
-      const db = getDb();
-      if (!db) return;
-      try {
-        const rows = db
-          .select({
-            id:        eventLog.id,
-            eventType: eventLog.eventType,
-            message:   eventLog.message,
-            metadata:  eventLog.metadata,
-            timestamp: eventLog.timestamp,
-          })
-          .from(eventLog)
-          .where(like(eventLog.eventType, "command_%"))
-          .orderBy(desc(eventLog.id))
-          .limit(200) // fetch last 200 command events → yields ~50 cmds
-          .all();
-
-        if (!active) return;
-        setEntries(buildQueue(rows));
-      } catch { /* ignore */ }
+      const rows = loadCommandEvents();
+      if (active && rows) setEntries(buildQueue(rows));
     };
 
     fetch();

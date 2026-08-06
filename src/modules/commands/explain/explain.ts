@@ -1,17 +1,11 @@
-import { askCurrent } from "../../../core/llm";
 import { buildPrompt, preview } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
-
-function nowMs(): number {
-  return Date.now();
-}
+import { executeLlmReply } from "../llmReply";
 
 export const explainCommand: CommandModule = {
   name: "explain",
   match: (text) => text === "!explain" || text.startsWith("!explain "),
   async run({ client, message, text }) {
-    const t0 = nowMs();
-
     const userPrompt = text.slice("!explain".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -48,44 +42,11 @@ Rules:
     console.log("[explain] prompt length:", prompt.length);
     console.log("[explain] prompt preview:", preview(prompt, 220));
 
-    try {
-      const t1 = nowMs();
-      const answer = await askCurrent(prompt, systemInstruction);
-      console.log("[explain] model done inMs:", nowMs() - t1);
-      console.log("[explain] answer preview:", preview(answer, 200));
-
-      const replyToId = replied?.id;
-      console.log("[explain] sending reply", {
-        replyToId,
-        chatId: message.chatId?.toString?.(),
-      });
-
-      const sendStart = nowMs();
-      try {
-        await client.sendMessage(message.chatId!, {
-          message: answer,
-          ...(replyToId ? { replyTo: replyToId } : {}),
-        });
-      } catch (sendErr) {
-        console.error("[explain] telegram send message error:", sendErr);
-        try {
-          await message.reply({ message: "Ошибка при отправке объяснения в Telegram." });
-        } catch (replyErr) {
-          console.error("[explain] failed to send telegram error reply:", replyErr);
-        }
-      }
-
-      console.log("[explain] telegram send done inMs:", nowMs() - sendStart);
-      console.log("[explain] total elapsed inMs:", nowMs() - t0);
-      return true;
-    } catch (err) {
-      console.error("[explain] error:", err);
-      try {
-        await message.reply({ message: "Ошибка при обращении к LLM, смотри логи." });
-      } catch (replyErr) {
-        console.error("[explain] failed to send error reply:", replyErr);
-      }
-      throw err;
-    }
+    await executeLlmReply({
+      client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "explain",
+      sendErrorMessage: "Ошибка при отправке объяснения в Telegram.",
+      llmErrorMessage: "Ошибка при обращении к LLM, смотри логи.",
+    });
+    return true;
   },
 };

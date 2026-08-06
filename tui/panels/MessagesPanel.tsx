@@ -1,29 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { getDb, messages } from "../core/db";
-import { eq, desc, asc, sql, gt } from "drizzle-orm";
+import { loadChats, loadMessages } from "../data/queries";
 import { POLL_CHATLIST_MS, POLL_MSGFEED_MS } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ChatSummary {
-  chatId:    string;
-  chatTitle: string;       // resolved name or raw ID fallback
-  lastTs:    number;
-  count:     number;
-}
-
-interface MessageRow {
-  id:         number;
-  messageId:  number;
-  chatId:     string;
-  senderId:   string | null;
-  senderName: string | null;
-  text:       string | null;
-  timestamp:  number;
-  isOutgoing: boolean;
-  chatTitle:  string | null;
-}
+import type { ChatSummary, MessageRow } from "../data/queries";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -76,27 +58,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     let active = true;
 
     const fetchChats = () => {
-      const db = getDb();
-      if (!db) return;
-      try {
-        const rows = db.all<{ chatId: string; chatTitle: string | null; lastTs: number; count: number }>(
-          sql`SELECT chat_id as chatId,
-                     MAX(chat_title) as chatTitle,
-                     MAX(timestamp) as lastTs,
-                     COUNT(*) as count
-              FROM messages
-              GROUP BY chat_id
-              ORDER BY lastTs DESC
-              LIMIT 50`
-        );
-        if (!active) return;
-        setChats(rows.map((r) => ({
-          chatId:    r.chatId,
-          chatTitle: r.chatTitle ?? r.chatId,
-          lastTs:    r.lastTs,
-          count:     r.count,
-        })));
-      } catch { /* ignore database lock or missing tables */ }
+      const rows = loadChats();
+      if (active && rows) setChats(rows);
     };
 
     fetchChats();
@@ -116,30 +79,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     setPage(0);
 
     const fetchMsgs = () => {
-      const db = getDb();
-      if (!db) return;
-      try {
-        const rows = db
-          .select()
-          .from(messages)
-          .where(eq(messages.chatId, selectedChat.chatId))
-          .orderBy(desc(messages.id))
-          .limit(300)
-          .all();
-
-        if (!active) return;
-        setMsgBuffer(rows.map((r) => ({
-          id:         r.id,
-          messageId:  r.messageId,
-          chatId:     r.chatId,
-          senderId:   r.senderId ?? null,
-          senderName: r.senderName ?? null,
-          text:       r.text ?? null,
-          timestamp:  r.timestamp,
-          isOutgoing: r.isOutgoing,
-          chatTitle:  r.chatTitle ?? null,
-        })).reverse());
-      } catch { /* ignore */ }
+      const rows = loadMessages(selectedChat.chatId);
+      if (active && rows) setMsgBuffer(rows);
     };
 
     fetchMsgs();
