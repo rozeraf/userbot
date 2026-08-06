@@ -179,8 +179,8 @@ function TuiApp() {
   const queueFocused = focus === "queue"    && visiblePanels.has("commandQueue");
 
   // ── Height budget ──────────────────────────────────────────────────────────
-  // Header: 3 rows, padding top+bottom: 2, footer: 3, margin: 1 → 9 fixed rows
-  const CHROME_ROWS = 9;
+  // Header: 1 row, footer: 1 row, paddingY: 0 → 4 fixed rows (2 separators + 2 content)
+  const CHROME_ROWS = 4;
   const availH = Math.max(8, termRows - CHROME_ROWS);
 
   // Right-column panels share available height equally
@@ -198,16 +198,19 @@ function TuiApp() {
     "MAIN [Tab→]";
 
   return (
-    <Box flexDirection="column" width={termCols} height={termRows} padding={1} overflow="hidden">
-      {/* ── Header ── */}
-      <Box borderStyle="single" borderColor="cyan" paddingX={2} marginBottom={1} justifyContent="space-between">
-        <Text bold color="cyan">⚡ TG-GEMINI-USERBOT TUI ⚡</Text>
+    <Box flexDirection="column" width={termCols} height={termRows} paddingX={1} overflow="hidden">
+      {/* ── Header: single line ── */}
+      <Box justifyContent="space-between" paddingX={1}
+           borderStyle="single" borderColor="cyan"
+           borderTop={false} borderLeft={false} borderRight={false}>
+        <Text bold color="cyan">⚡ TG-GEMINI-USERBOT</Text>
         <Text color="gray">
-          Status: <Text bold color={headerStatusColor}>{data.isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
-          {" | "}
+          <Text bold color={headerStatusColor}>{data.isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
+          {" · "}
           Ping: <Text color={data.pingMs ? "green" : "gray"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text>
-          {" | "}
+          {" · "}
           <Text color={focus !== "main" ? "yellow" : "gray"}>Focus: {focusLabel}</Text>
+          {"  [q]quit"}
         </Text>
       </Box>
 
@@ -269,21 +272,23 @@ function TuiApp() {
         </Box>
       </Box>
 
-      {/* ── Footer ── */}
-      <Box borderStyle="single" borderColor="gray" paddingX={2} marginTop={1} justifyContent="space-between">
+      {/* ── Footer: single line ── */}
+      <Box paddingX={1}
+           borderStyle="single" borderColor="gray"
+           borderBottom={false} borderLeft={false} borderRight={false}>
         {msgFocused
-          ? <Text color="yellow">Msgs: ←→ sides | ↑↓ nav | PgUp/Dn page | [Tab]→</Text>
+          ? <Text color="yellow">Msgs: ←→ sides · ↑↓ nav · PgUp/Dn · [Tab]→</Text>
           : llmFocused
-          ? <Text color="yellow">LLM: [p]prov [o]status | ↑↓ | [d]detail | [x]export | [X]batch | [Tab]→</Text>
+          ? <Text color="yellow">LLM: [p]prov [o]stat · ↑↓ · [d]detail · [x]export · [X]batch · [Tab]→</Text>
           : logFocused
-          ? <Text color="yellow">Log: [s/c/r/l/e] filter | ↑↓ | [x]export | [X]batch | [!]errors | [f]freeze | [Tab]→</Text>
+          ? <Text color="yellow">Log: [s/c/r/l/e] filter · ↑↓ · [x]export · [X]batch · [!]errors · [f]freeze · [Tab]→</Text>
           : queueFocused
-          ? <Text color="yellow">Queue: ↑↓ navigate | [Tab]→</Text>
-          : <Text color="gray">[1]Status [2]Msgs [3]LLM [4]Log [5]Queue | [Tab] cycle focus</Text>
+          ? <Text color="yellow">Queue: ↑↓ nav · [Tab]→</Text>
+          : <Text color="gray">[1]Status [2]Msgs [3]LLM [4]Log [5]Queue · [Tab] cycle focus</Text>
         }
-        <Text color="red" bold>[q] Quit</Text>
       </Box>
     </Box>
+
   );
 }
 
