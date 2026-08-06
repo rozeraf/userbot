@@ -72,15 +72,6 @@ async function main() {
   await client.connect();
   console.log("[tg] connected");
   
-  database.setStatus("active");
-  try {
-    const pingStart = Date.now();
-    await client.getEntity("me");
-    database.setPing(Date.now() - pingStart);
-  } catch (e) {
-    console.warn("[tg] failed to ping Telegram", e);
-  }
-
   database.logEvent({
     eventType: "tg_connected",
     level: "info",
@@ -133,6 +124,15 @@ async function main() {
       console.error("[tg] auth error:", err);
       shutdown(1);
     }
+  }
+
+  database.setStatus("active");
+  try {
+    const pingStart = Date.now();
+    await client.getEntity("me");
+    database.setPing(Date.now() - pingStart);
+  } catch (e) {
+    console.warn("[tg] failed to ping Telegram", e);
   }
 
   console.log("Юзербот запущен.");

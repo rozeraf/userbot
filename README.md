@@ -66,10 +66,12 @@ TG_API_HASH=abcdef1234567890abcdef1234567890
 # LLM — выбрать один провайдер по умолчанию:
 LLM_PROVIDER=gemini          # или cerebras
 
-GEMINI_API_KEY=...
+GEMINI_API_KEY=...              # один ключ (обратная совместимость)
+# GEMINI_API_KEYS=key-1,key-2   # несколько ключей: случайный выбор на каждый запрос
 GEMINI_MODEL=gemini-2.0-flash   # опционально
 
-CEREBRAS_API_KEY=...
+CEREBRAS_API_KEY=...            # один ключ (обратная совместимость)
+# CEREBRAS_API_KEYS=key-1,key-2 # несколько ключей: случайный выбор на каждый запрос
 CEREBRAS_MODEL=gpt-oss-120b     # опционально
 
 # Системный промпт (общий стиль ответов):
@@ -249,9 +251,9 @@ SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchr
 | `TG_API_HASH` | ✓ | — | Telegram App Hash |
 | `TG_SESSION` | — | `""` | Сохранённая сессия (заполняется после первого входа) |
 | `LLM_PROVIDER` | — | `gemini` | Провайдер по умолчанию: `gemini` или `cerebras` |
-| `GEMINI_API_KEY` | если `gemini` | — | Ключ Google AI Studio |
+| `GEMINI_API_KEY` / `GEMINI_API_KEYS` | если `gemini` | — | Один ключ или список ключей через запятую/новую строку |
 | `GEMINI_MODEL` | — | `gemini-2.0-flash` | Модель Gemini |
-| `CEREBRAS_API_KEY` | если `cerebras` | — | Ключ Cerebras |
+| `CEREBRAS_API_KEY` / `CEREBRAS_API_KEYS` | если `cerebras` | — | Один ключ или список ключей через запятую/новую строку |
 | `CEREBRAS_MODEL` | — | `gpt-oss-120b` | Модель Cerebras |
 | `SYSTEM_PROMPT` | — | `""` | Системный промпт для всех `!answer`-запросов |
 | `DB_PATH` | — | `./userbot.db` | Путь к SQLite-базе |
@@ -272,5 +274,5 @@ SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchr
 — Проверь API-ключ и лимиты запросов.
 — При таймауте (>45 с) бот сам сообщит об ошибке в чат.
 
-**`LLM_PROVIDER=gemini` но `GEMINI_API_KEY` не задан**
+**`LLM_PROVIDER=gemini`, но не задан ни `GEMINI_API_KEY`, ни `GEMINI_API_KEYS`**
 — Бот не запустится, выдаст ошибку при старте — это намеренно.

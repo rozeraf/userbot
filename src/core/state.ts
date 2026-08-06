@@ -11,12 +11,12 @@ function loadSavedProvider(): Provider {
       const data = fs.readFileSync(STATE_FILE, "utf-8").trim();
       if (data === "gemini" || data === "cerebras") {
         // Validate that the loaded provider actually has its API key configured
-        if (data === "gemini" && !ENV.GEMINI_API_KEY) {
-          console.warn("[state] Saved provider is gemini but GEMINI_API_KEY is missing. Falling back to default.");
+        if (data === "gemini" && ENV.GEMINI_API_KEYS.length === 0) {
+          console.warn("[state] Saved provider is gemini but no Gemini API keys are configured. Falling back to default.");
           return ENV.LLM_PROVIDER;
         }
-        if (data === "cerebras" && !ENV.CEREBRAS_API_KEY) {
-          console.warn("[state] Saved provider is cerebras but CEREBRAS_API_KEY is missing. Falling back to default.");
+        if (data === "cerebras" && ENV.CEREBRAS_API_KEYS.length === 0) {
+          console.warn("[state] Saved provider is cerebras but no Cerebras API keys are configured. Falling back to default.");
           return ENV.LLM_PROVIDER;
         }
         return data;

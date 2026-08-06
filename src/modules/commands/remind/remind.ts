@@ -1,15 +1,9 @@
 import type { CommandModule } from "../types";
 
-function nowMs(): number {
-  return Date.now();
-}
-
 export const remindCommand: CommandModule = {
   name: "remind",
   match: (text) => text === "!remind" || text.startsWith("!remind "),
   async run({ client, message, text }) {
-    const t0 = nowMs();
-
     const userInput = text.slice("!remind".length).trim();
 
     console.log("[remind] trigger detected", {

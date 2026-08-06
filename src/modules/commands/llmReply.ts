@@ -1,5 +1,7 @@
 import { askCurrent } from "../../core/llm";
 import { preview } from "../../core/llm/prompt";
+import { LoggedCommandError, errorMessage } from "../../core/errors";
+import { database } from "../../core/db";
 import type { CommandContext } from "./types";
 
 type Options = Pick<CommandContext, "client" | "message"> & {
@@ -22,25 +24,12 @@ export async function executeLlmReply({
   llmErrorMessage,
   logPrefix,
 }: Options): Promise<void> {
+  let answer: string;
   try {
     const startedAt = Date.now();
-    const answer = await askCurrent(prompt, systemInstruction);
+    answer = await askCurrent(prompt, systemInstruction);
     console.log(`[${logPrefix}] model done inMs:`, Date.now() - startedAt);
     console.log(`[${logPrefix}] answer preview:`, preview(answer, 200));
-
-    try {
-      await client.sendMessage(message.chatId!, {
-        message: answer,
-        ...(replyToId ? { replyTo: replyToId } : {}),
-      });
-    } catch (sendErr) {
-      console.error(`[${logPrefix}] telegram send message error:`, sendErr);
-      try {
-        await message.reply({ message: sendErrorMessage });
-      } catch (replyErr) {
-        console.error(`[${logPrefix}] failed to send Telegram error reply:`, replyErr);
-      }
-    }
   } catch (err) {
     console.error(`[${logPrefix}] error:`, err);
     try {
@@ -48,6 +37,27 @@ export async function executeLlmReply({
     } catch (replyErr) {
       console.error(`[${logPrefix}] failed to send LLM error reply:`, replyErr);
     }
-    throw err;
+    throw new LoggedCommandError(errorMessage(err), { cause: err });
+  }
+
+  try {
+    await client.sendMessage(message.chatId!, {
+      message: answer,
+      ...(replyToId ? { replyTo: replyToId } : {}),
+    });
+  } catch (err) {
+    console.error(`[${logPrefix}] telegram send message error:`, err);
+    database.logEvent({
+      eventType: "telegram_send_error",
+      level: "error",
+      category: "error",
+      message: `Failed to send ${logPrefix} response: ${errorMessage(err)}`,
+    });
+    try {
+      await message.reply({ message: sendErrorMessage });
+    } catch (replyErr) {
+      console.error(`[${logPrefix}] failed to send Telegram error reply:`, replyErr);
+    }
+    throw new LoggedCommandError(errorMessage(err), { cause: err });
   }
 }

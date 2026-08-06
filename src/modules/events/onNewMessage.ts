@@ -4,7 +4,7 @@ import { Api } from "telegram";
 import { COMMANDS } from "../commands";
 import { database } from "../../core/db";
 import { randomBytes } from "crypto";
-import { errorMessage } from "../../core/errors";
+import { errorMessage, isLoggedCommandError } from "../../core/errors";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
@@ -102,18 +102,23 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
         });
       } catch (err: unknown) {
         console.error(`[event] Error executing command "${cmd.name}":`, err);
+        const alreadyLogged = isLoggedCommandError(err);
         database.logEvent({
           eventType: "command_error",
-          level: "error",
-          category: "error",
+          level: alreadyLogged ? "warn" : "error",
+          category: alreadyLogged ? "client" : "error",
           message: `Error executing command "${cmd.name}": ${errorMessage(err)}`,
-          metadata: { chatId, correlationId, commandName: cmd.name, error: errorMessage(err) },
+          metadata: { chatId, correlationId, commandName: cmd.name, error: errorMessage(err), alreadyLogged },
         });
       } finally {
         database.setQueueState("idle");
       }
       });
   } else {
+    if (isOutgoing && text.startsWith("!")) {
+      void message.reply({ message: "Неизвестная команда. Используй !help для списка команд." })
+        .catch((err) => console.error("[event] failed to send unknown-command reply:", err));
+    }
     // Non-command message: log asynchronously as soon as names are resolved, without blocking the queue
     Promise.all([chatPromise, senderPromise])
       .then(([chatTitle, senderName]) => {

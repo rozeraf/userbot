@@ -1,4 +1,4 @@
-import { ENV } from "../../config/env";
+import { ENV, pickRandomApiKey } from "../../config/env";
 import { normalizeText } from "./prompt";
 import { errorMessage } from "../errors";
 
@@ -20,7 +20,8 @@ function nowMs(): number {
 }
 
 export async function askGemini(prompt: string, systemPrompt?: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${ENV.GEMINI_MODEL}:generateContent?key=${ENV.GEMINI_API_KEY}`;
+  const apiKey = pickRandomApiKey(ENV.GEMINI_API_KEYS);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${ENV.GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
   const t0 = nowMs();
   console.log("[gemini] request start");

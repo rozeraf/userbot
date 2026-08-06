@@ -1,4 +1,4 @@
-import { ENV } from "../../config/env";
+import { ENV, pickRandomApiKey } from "../../config/env";
 import { normalizeText } from "./prompt";
 import { errorMessage } from "../errors";
 
@@ -18,6 +18,7 @@ function nowMs(): number {
 
 export async function askCerebras(prompt: string, systemPrompt?: string): Promise<string> {
   const url = "https://api.cerebras.ai/v1/chat/completions";
+  const apiKey = pickRandomApiKey(ENV.CEREBRAS_API_KEYS);
 
   const t0 = nowMs();
   console.log("[cerebras] request start");
@@ -39,7 +40,7 @@ export async function askCerebras(prompt: string, systemPrompt?: string): Promis
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${ENV.CEREBRAS_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: ENV.CEREBRAS_MODEL,

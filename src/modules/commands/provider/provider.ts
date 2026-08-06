@@ -10,10 +10,10 @@ export const providerCommand: CommandModule = {
   async run({ message, text }) {
     const provider: Provider = text === "!gemini" ? "gemini" : "cerebras";
     const config = provider === "gemini"
-      ? { apiKey: ENV.GEMINI_API_KEY, envName: "GEMINI_API_KEY", label: "Gemini" }
-      : { apiKey: ENV.CEREBRAS_API_KEY, envName: "CEREBRAS_API_KEY", label: "Cerebras" };
+      ? { apiKeys: ENV.GEMINI_API_KEYS, envName: "GEMINI_API_KEYS", label: "Gemini" }
+      : { apiKeys: ENV.CEREBRAS_API_KEYS, envName: "CEREBRAS_API_KEYS", label: "Cerebras" };
 
-    if (!config.apiKey) {
+    if (config.apiKeys.length === 0) {
       try {
         await message.reply({ message: `Ошибка: В .env не задан ${config.envName}.` });
       } catch (replyErr) {
