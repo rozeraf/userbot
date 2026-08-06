@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "bun run index.ts",
+    "dev": "bun run --watch index.ts",
     "tui": "bun run tui/index.tsx"
   },
   "dependencies": {
