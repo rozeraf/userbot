@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { db, messages } from "../core/db";
+import { getDb, messages } from "../core/db";
 import { eq, desc, asc, sql, gt } from "drizzle-orm";
+import { POLL_CHATLIST_MS, POLL_MSGFEED_MS } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,8 +27,6 @@ interface MessageRow {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CHAT_POLL_MS = 2000;
-const MSG_POLL_MS  = 1000;
 const PAGE_SIZE    = 80;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,6 +76,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     let active = true;
 
     const fetchChats = () => {
+      const db = getDb();
+      if (!db) return;
       try {
         const rows = db.all<{ chatId: string; chatTitle: string | null; lastTs: number; count: number }>(
           sql`SELECT chat_id as chatId,
@@ -95,11 +96,11 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
           lastTs:    r.lastTs,
           count:     r.count,
         })));
-      } catch { /* ignore */ }
+      } catch { /* ignore database lock or missing tables */ }
     };
 
     fetchChats();
-    const id = setInterval(fetchChats, CHAT_POLL_MS);
+    const id = setInterval(fetchChats, POLL_CHATLIST_MS);
     return () => { active = false; clearInterval(id); };
   }, []);
 
@@ -115,6 +116,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     setPage(0);
 
     const fetchMsgs = () => {
+      const db = getDb();
+      if (!db) return;
       try {
         const rows = db
           .select()
@@ -139,7 +142,7 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     };
 
     fetchMsgs();
-    const id = setInterval(fetchMsgs, MSG_POLL_MS);
+    const id = setInterval(fetchMsgs, POLL_MSGFEED_MS);
     return () => { active = false; clearInterval(id); };
   }, [selectedChat?.chatId]);
 

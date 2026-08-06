@@ -3,12 +3,26 @@ import { render, Box, Text, useInput, useApp, useStdout } from "ink";
 import { loadTuiConfig, saveTuiConfig } from "./core/config";
 import type { PanelName } from "./core/config";
 import { usePoll } from "./core/usePoll";
-import { db, messages, llmCalls, eventLog, statusSnapshot } from "./core/db";
+import { isDbReady, getDb, messages, llmCalls, eventLog, statusSnapshot } from "./core/db";
+import { POLL_SNAPSHOT_MS } from "./core/constants";
 import { sql } from "drizzle-orm";
 import { EventLogPanel }     from "./panels/EventLogPanel";
 import { CommandQueuePanel } from "./panels/CommandQueuePanel";
 import { MessagesPanel }     from "./panels/MessagesPanel";
 import { LlmCallsPanel }     from "./panels/LlmCallsPanel";
+import { WaitingScreen }     from "./panels/WaitingScreen";
+
+// ── Graceful shutdown: Ctrl+C / SIGINT never crashes the terminal ──────────────
+process.on("SIGINT",  () => { process.exit(0); });
+process.on("SIGTERM", () => { process.exit(0); });
+process.on("uncaughtException", (err) => {
+  // Log to stderr (won't corrupt Ink's stdout rendering) then exit cleanly
+  process.stderr.write(`[TUI] Uncaught exception: ${err?.message ?? err}\n`);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  process.stderr.write(`[TUI] Unhandled rejection: ${reason}\n`);
+});
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
@@ -93,6 +107,13 @@ function TuiApp() {
 
   const data = usePoll<StatusData>(
     async () => {
+      const db = getDb();
+      if (!db) return {
+        messages: 0, llmCalls: 0, events: 0,
+        status: "waiting", provider: "N/A", connectedSince: null,
+        pingMs: null, incomingCount: 0, outgoingCount: 0, aiRequestCount: 0,
+        errorCount: 0, queueState: "waiting", memoryMb: 0, updatedAt: null, isStale: true,
+      };
       try {
         const msgCount = db.select({ count: sql<number>`count(*)` }).from(messages).all()[0]?.count ?? 0;
         const llmCount = db.select({ count: sql<number>`count(*)` }).from(llmCalls).all()[0]?.count ?? 0;
@@ -123,7 +144,7 @@ function TuiApp() {
         };
       }
     },
-    500,
+    POLL_SNAPSHOT_MS,
     {
       messages: 0, llmCalls: 0, events: 0,
       status: "loading", provider: "N/A", connectedSince: null,
@@ -132,8 +153,13 @@ function TuiApp() {
     }
   );
 
+  // ── DB not ready: show waiting screen ─────────────────────────────────────────────
+  if (!isDbReady()) {
+    return <WaitingScreen width={termCols} height={termRows} />;
+  }
+
   const uptimeMs  = data.connectedSince ? (now - data.connectedSince) : null;
-  const uptimeStr = (data.status === "disconnected" || data.status === "error" || data.status === "loading")
+  const uptimeStr = (data.status === "disconnected" || data.status === "error" || data.status === "loading" || data.status === "waiting")
     ? "N/A"
     : formatUptime(uptimeMs);
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { db, llmCalls } from "../core/db";
+import { getDb, llmCalls } from "../core/db";
 import { desc, asc, isNotNull, eq, or, isNull } from "drizzle-orm";
 import { writeFileSync } from "fs";
+import { POLL_LLMCALLS_MS } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,6 @@ type StatusFilter   = "all" | "ok" | "error";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const POLL_MS   = 1500;
 const PAGE_SIZE = 80;
 
 // Latency thresholds for coloring
@@ -130,6 +130,8 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
     let active = true;
 
     const fetch = () => {
+      const db = getDb();
+      if (!db) return;
       try {
         const rows = db
           .select()
@@ -147,11 +149,11 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
           error:     r.error ?? null,
           timestamp: r.timestamp,
         })));
-      } catch { /* ignore */ }
+      } catch { /* ignore database lock or missing tables */ }
     };
 
     fetch();
-    const id = setInterval(fetch, POLL_MS);
+    const id = setInterval(fetch, POLL_LLMCALLS_MS);
     return () => { active = false; clearInterval(id); };
   }, []);
 

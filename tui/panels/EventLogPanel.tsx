@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { db, eventLog } from "../core/db";
+import { getDb, eventLog } from "../core/db";
 import { gt, asc, eq, desc } from "drizzle-orm";
 import { writeFileSync } from "fs";
+import { POLL_EVENTLOG_MS } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,6 @@ export interface LogEntry {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MAX_BUFFER     = 1000;
-const POLL_MS        = 500;
 const ERROR_LIMITS   = [20, 50, 100] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -156,6 +156,8 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetchLive = () => {
+      const db = getDb();
+      if (!db) return;
       try {
         const rows = db
           .select()
@@ -187,7 +189,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     };
 
     fetchLive();
-    const id = setInterval(fetchLive, POLL_MS);
+    const id = setInterval(fetchLive, POLL_EVENTLOG_MS);
     return () => { active = false; clearInterval(id); };
   }, []);
 
@@ -198,6 +200,8 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetchErrors = () => {
+      const db = getDb();
+      if (!db) return;
       try {
         const rows = db
           .select()
@@ -224,7 +228,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     };
 
     fetchErrors();
-    const id = setInterval(fetchErrors, POLL_MS);
+    const id = setInterval(fetchErrors, POLL_EVENTLOG_MS);
     return () => { active = false; clearInterval(id); };
   }, [viewMode, errorLimit]);
 

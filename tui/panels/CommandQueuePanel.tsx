@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { db, eventLog } from "../core/db";
+import { getDb, eventLog } from "../core/db";
 import { like, desc } from "drizzle-orm";
+import { POLL_CMDQUEUE_MS } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,8 +22,6 @@ interface CommandEntry {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const POLL_MS = 500;
 
 function formatTime(ts: number): string {
   const d  = new Date(ts);
@@ -174,6 +173,8 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetch = () => {
+      const db = getDb();
+      if (!db) return;
       try {
         const rows = db
           .select({
@@ -195,7 +196,7 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
     };
 
     fetch();
-    const id = setInterval(fetch, POLL_MS);
+    const id = setInterval(fetch, POLL_CMDQUEUE_MS);
     return () => { active = false; clearInterval(id); };
   }, []);
 
