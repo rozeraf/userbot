@@ -29,6 +29,20 @@
       "when": 1786034853952,
       "tag": "0003_integrity_and_traceability",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786035829959,
+      "tag": "0004_jazzy_thunderbolts",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786036023617,
+      "tag": "0005_gifted_multiple_man",
+      "breakpoints": true
     }
   ]
 }

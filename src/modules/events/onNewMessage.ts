@@ -6,6 +6,7 @@ import { database } from "../../core/db";
 import { randomBytes } from "crypto";
 import { errorMessage, isLoggedCommandError } from "../../core/errors";
 import { consumeServiceMessage } from "../../core/telegram";
+import { state } from "../../core/state";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
@@ -53,30 +54,29 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   const isOutgoing = message.out ?? false;
   const isServiceMessage = isOutgoing && consumeServiceMessage(chatId, message.id);
 
-  // ── Resolve names in parallel immediately upon arrival ──────────────────────
-  const chatPromise = message.getChat()
-    .then(resolveEntityName)
-    .catch(() => undefined);
-
-  const senderPromise = (!isOutgoing)
-    ? message.getSender().then(resolveEntityName).catch(() => undefined)
-    : Promise.resolve(undefined);
-
   // Synchronously determine if this is a command to lock its order in the queue
   let matchedCmd: typeof COMMANDS[number] | undefined;
   if (isOutgoing && !isServiceMessage && text.startsWith("!")) {
     matchedCmd = COMMANDS.find((c) => c.match(text));
   }
 
+  // Names are display metadata, not part of command execution. Avoid a network
+  // lookup altogether for commands, and resolve them concurrently for messages.
+  const chatPromise = matchedCmd
+    ? Promise.resolve(undefined)
+    : message.getChat().then(resolveEntityName).catch(() => undefined);
+  const senderPromise = (!isOutgoing && !matchedCmd)
+    ? message.getSender().then(resolveEntityName).catch(() => undefined)
+    : Promise.resolve(undefined);
+
   if (matchedCmd) {
     const cmd = matchedCmd;
+    // Provider is part of the command's input: a switch in another chat must
+    // not change this command while it waits in its per-chat queue.
+    const provider = state.getProvider();
     enqueueCommand(chatId, async () => {
       activeCommands++;
-      // 1. Wait for name resolution (which started in parallel when message arrived)
-      const chatTitle = await chatPromise;
-      const senderName = await senderPromise;
-
-      // 2. Log the command message to the DB (guarantees command message is logged before execution logs)
+      // Display metadata must never hold a command queue.
       database.logMessage({
         messageId:  message.id,
         chatId,
@@ -84,29 +84,36 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
         text,
         isOutgoing: true,
         telegramTimestamp: message.date ? message.date * 1000 : null,
-        chatTitle:  chatTitle ?? null,
-        senderName: senderName ?? null,
+        chatTitle: null,
+        senderName: null,
       });
 
       console.log("[event] executing queued command:", {
         chatId,
-        chatTitle,
         text: text.slice(0, 180),
       });
 
-      let correlationId: string | undefined;
+      const correlationId = randomBytes(12).toString("hex");
+      let claimed = false;
+      let succeeded = false;
+      let failure: string | undefined;
       try {
-        correlationId = randomBytes(6).toString("hex");
+        claimed = database.beginCommand({ chatId, messageId: message.id, commandName: cmd.name, correlationId, provider });
+        if (!claimed) {
+          console.warn("[event] ignored duplicate command update:", { chatId, messageId: message.id });
+          return;
+        }
         database.setQueueState(`executing: ${activeCommands} command(s)`);
         database.logEvent({
           eventType: "command_start",
           level: "info",
           category: "client",
           message: `Executing command: ${cmd.name}`,
-          metadata: { chatId, chatTitle, text, correlationId, commandName: cmd.name },
+          metadata: { chatId, text, correlationId, commandName: cmd.name, provider },
         });
 
-        await cmd.run({ client, message, text, correlationId });
+        await cmd.run({ client, message, text, correlationId, provider });
+        succeeded = true;
 
         database.logEvent({
           eventType: "command_success",
@@ -116,6 +123,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
           metadata: { chatId, correlationId, commandName: cmd.name },
         });
       } catch (err: unknown) {
+        failure = errorMessage(err);
         console.error(`[event] Error executing command "${cmd.name}":`, err);
         const alreadyLogged = isLoggedCommandError(err);
         database.logEvent({
@@ -126,6 +134,15 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
           metadata: { chatId, correlationId, commandName: cmd.name, error: errorMessage(err), alreadyLogged },
         });
       } finally {
+        // A failed claim is retained deliberately: replaying a Telegram update
+        // must not generate a second paid LLM request or duplicate reply.
+        if (claimed) {
+          try {
+            database.finishCommand(chatId, message.id, succeeded ? "succeeded" : "failed", failure);
+          } catch (finishErr) {
+            console.error("[event] failed to finalize command execution:", finishErr);
+          }
+        }
         activeCommands--;
         database.setQueueState(activeCommands > 0 ? `executing: ${activeCommands} command(s)` : "idle");
       }

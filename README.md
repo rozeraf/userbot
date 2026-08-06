@@ -74,6 +74,9 @@ CEREBRAS_API_KEY=...            # один ключ (обратная совме
 # CEREBRAS_API_KEYS=key-1,key-2 # несколько ключей: случайный выбор на каждый запрос
 CEREBRAS_MODEL=gpt-oss-120b     # опционально
 
+# Необязательно: число дней хранения приватных журналов. 0 = бессрочно.
+DB_RETENTION_DAYS=0
+
 # Системный промпт (общий стиль ответов):
 SYSTEM_PROMPT="Отвечай кратко и по существу."
 
@@ -206,7 +209,7 @@ git add src/core/db/migrations/
 ```ts
 import { db } from "./src/core/db/client";
 import { messages, llmCalls } from "./src/core/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNotNull } from "drizzle-orm";
 
 // Последние 50 сообщений из чата
 db.select()
@@ -219,7 +222,7 @@ db.select()
 // Все неудачные вызовы LLM
 db.select()
   .from(llmCalls)
-  .where(eq(llmCalls.error, null))
+  .where(isNotNull(llmCalls.error))
   .all();
 ```
 
@@ -229,7 +232,7 @@ db.select()
 
 ### Производительность записи
 
-SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchronous = NORMAL` — это даёт параллельное чтение/запись без блокировок и высокую пропускную способность без риска потери данных при штатном завершении.
+SQLite работает в режиме **WAL** с `synchronous = FULL`: запись немного дороже, зато при сбое питания не теряются уже подтверждённые транзакции. Буфер журналов всё ещё может потерять записи, не успевшие попасть в БД; критически важное выполнение команды фиксируется отдельно до вызова LLM.
 
 ### Очередь команд
 
@@ -241,8 +244,8 @@ SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchr
 
 ### Устойчивость к сбоям
 
-- `unhandledRejection` и `uncaughtException` перехватываются и логируются в БД, процесс не падает
-- Буфер БД откатывается при ошибке транзакции, данные не теряются
+- `unhandledRejection` логируется; `uncaughtException` сначала сохраняется в журнал, затем процесс корректно завершается
+- При ошибке транзакции буфер возвращается в память и повторяет запись с экспоненциальной задержкой
 
 ---
 
@@ -258,7 +261,8 @@ SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchr
 | `GEMINI_MODEL` | — | `gemini-2.0-flash` | Модель Gemini |
 | `CEREBRAS_API_KEY` / `CEREBRAS_API_KEYS` | если `cerebras` | — | Один ключ или список ключей через запятую/новую строку |
 | `CEREBRAS_MODEL` | — | `gpt-oss-120b` | Модель Cerebras |
-| `SYSTEM_PROMPT` | — | `""` | Системный промпт для всех `!answer`-запросов |
+| `SYSTEM_PROMPT` | — | `""` | Общий системный промпт для всех LLM-команд; правила конкретной команды добавляются после него |
+| `DB_RETENTION_DAYS` | — | `0` | Срок хранения локальных журналов в днях; `0` отключает автоматическое удаление |
 | `DB_PATH` | — | `./userbot.db` | Путь к SQLite-базе |
 
 ---

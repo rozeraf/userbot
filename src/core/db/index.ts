@@ -1,7 +1,8 @@
-import { closeDb, db } from "./client";
-import { messages, llmCalls, eventLog, statusSnapshot } from "./schema";
+import { closeDb, db, secureDbFiles, sqlite } from "./client";
+import { messages, llmCalls, eventLog, statusSnapshot, commandExecutions } from "./schema";
 import type { NewMessage, NewLLMCall, NewEvent } from "./schema";
 import { state } from "../state";
+import { ENV } from "../../config/env";
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 
 // Re-export the write-side database API for bot-only consumers.
@@ -34,6 +35,8 @@ let consecutiveFlushFailures = 0;
 let nextFlushAt = 0;
 let droppedRecords = 0;
 let lastDropWarningAt = 0;
+let nextRetentionPruneAt = 0;
+const RETENTION_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // ── In-Memory Counters & Status ───────────────────────────────────────────────
 
@@ -90,9 +93,15 @@ export const database = {
   start() {
     if (isClosed) throw new Error("Cannot start a closed database");
     if (tickInterval) return;
+    database.pruneOldRecords();
+    nextRetentionPruneAt = Date.now() + RETENTION_PRUNE_INTERVAL_MS;
     tickInterval = setInterval(() => {
       database.flush();
       database.updateSnapshot();
+      if (Date.now() >= nextRetentionPruneAt) {
+        database.pruneOldRecords();
+        nextRetentionPruneAt = Date.now() + RETENTION_PRUNE_INTERVAL_MS;
+      }
     }, FLUSH_INTERVAL_MS);
   },
 
@@ -114,6 +123,34 @@ export const database = {
 
   setQueueState(stateStr: string) {
     queueState = stateStr;
+  },
+
+  /**
+   * Claims a Telegram command exactly once.  Telegram updates may be delivered
+   * again after reconnects, so logging a message is not sufficient deduplication.
+   */
+  beginCommand(input: {
+    chatId: string;
+    messageId: number;
+    commandName: string;
+    correlationId: string;
+    provider: "gemini" | "cerebras";
+  }): boolean {
+    const result = sqlite.run(
+      `INSERT INTO command_executions
+        (chat_id, message_id, command_name, correlation_id, provider, status, started_at)
+       VALUES (?, ?, ?, ?, ?, 'running', ?)
+       ON CONFLICT(chat_id, message_id) DO NOTHING`,
+      [input.chatId, input.messageId, input.commandName, input.correlationId, input.provider, Date.now()],
+    );
+    return result.changes > 0;
+  },
+
+  finishCommand(chatId: string, messageId: number, status: "succeeded" | "failed", error?: string) {
+    db.update(commandExecutions)
+      .set({ status, error: error ?? null, finishedAt: Date.now() })
+      .where(and(eq(commandExecutions.chatId, chatId), eq(commandExecutions.messageId, messageId)))
+      .run();
   },
 
   logMessage(msg: PendingMessage) {
@@ -213,6 +250,7 @@ export const database = {
         if (calls.length)  tx.insert(llmCalls).values(calls).run();
         if (events.length) tx.insert(eventLog).values(events).run();
       });
+      secureDbFiles();
       consecutiveFlushFailures = 0;
       nextFlushAt = 0;
       return true;
@@ -225,6 +263,28 @@ export const database = {
       const backoffMs = Math.min(MAX_FLUSH_BACKOFF_MS, 1_000 * 2 ** Math.min(consecutiveFlushFailures, 5));
       nextFlushAt = Date.now() + backoffMs;
       return false;
+    }
+  },
+
+  /** Retention is opt-in; deleting private history is never the default. */
+  pruneOldRecords() {
+    if (ENV.DB_RETENTION_DAYS === 0) return;
+    const cutoff = Date.now() - ENV.DB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    try {
+      db.transaction((tx) => {
+        tx.delete(messages).where(sql`${messages.timestamp} < ${cutoff}`).run();
+        tx.delete(llmCalls).where(sql`${llmCalls.timestamp} < ${cutoff}`).run();
+        tx.delete(eventLog).where(sql`${eventLog.timestamp} < ${cutoff}`).run();
+        tx.delete(commandExecutions).where(sql`${commandExecutions.startedAt} < ${cutoff}`).run();
+      });
+      database.logEvent({
+        eventType: "db_retention_prune",
+        level: "info",
+        category: "system",
+        message: `Deleted records older than ${ENV.DB_RETENTION_DAYS} day(s)`,
+      });
+    } catch (err) {
+      console.error("[db] Retention prune failed:", err);
     }
   },
 

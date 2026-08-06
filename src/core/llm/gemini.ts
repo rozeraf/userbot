@@ -1,5 +1,5 @@
 import { ENV, pickRandomApiKey } from "../../config/env";
-import { normalizeText } from "./prompt";
+import { combineSystemPrompts, normalizeText } from "./prompt";
 import { errorMessage } from "../errors";
 
 interface GeminiResponse {
@@ -34,7 +34,7 @@ export async function askGemini(prompt: string, systemPrompt?: string): Promise<
     ],
   };
 
-  const activeSystemPrompt = systemPrompt ?? ENV.SYSTEM_PROMPT;
+  const activeSystemPrompt = combineSystemPrompts(ENV.SYSTEM_PROMPT, systemPrompt);
   if (activeSystemPrompt) {
     body.systemInstruction = {
       parts: [{ text: activeSystemPrompt }],

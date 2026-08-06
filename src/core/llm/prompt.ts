@@ -11,6 +11,13 @@ export function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
 }
 
+/** Command-specific rules supplement, rather than silently replace, the user configuration. */
+export function combineSystemPrompts(base: string, commandRules?: string): string | undefined {
+  return [base.trim(), commandRules?.trim()]
+    .filter((prompt): prompt is string => Boolean(prompt))
+    .join("\n\n") || undefined;
+}
+
 export function preview(text: string, len = 120): string {
   const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)];
   return graphemes.length > len

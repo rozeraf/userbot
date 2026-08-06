@@ -5,7 +5,7 @@ import { executeLlmReply } from "../llmReply";
 export const summarizeCommand: CommandModule = {
   name: "summarize",
   match: (text) => text === "!summarize" || text.startsWith("!summarize "),
-  async run({ client, message, text, correlationId }) {
+  async run({ client, message, text, correlationId, provider }) {
     const userPrompt = text.slice("!summarize".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -42,7 +42,7 @@ Rules:
     console.log("[summarize] prompt length:", prompt.length);
 
     await executeLlmReply({
-      client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "summarize",
+      client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "summarize", provider,
       auditContext: { correlationId, commandName: "summarize", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке суммаризации в Telegram.",
       llmErrorMessage: "Ошибка при обращении к LLM, смотри логи.",

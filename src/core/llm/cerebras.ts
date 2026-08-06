@@ -1,5 +1,5 @@
 import { ENV, pickRandomApiKey } from "../../config/env";
-import { normalizeText } from "./prompt";
+import { combineSystemPrompts, normalizeText } from "./prompt";
 import { errorMessage } from "../errors";
 
 interface CerebrasChatResponse {
@@ -25,7 +25,7 @@ export async function askCerebras(prompt: string, systemPrompt?: string): Promis
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [];
 
-  const activeSystemPrompt = systemPrompt ?? ENV.SYSTEM_PROMPT;
+  const activeSystemPrompt = combineSystemPrompts(ENV.SYSTEM_PROMPT, systemPrompt);
   if (activeSystemPrompt) {
     messages.push({ role: "system", content: activeSystemPrompt });
   }

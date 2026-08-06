@@ -1,0 +1,1 @@
+CREATE INDEX `idx_command_executions_started` ON `command_executions` (`started_at`);

@@ -4,7 +4,7 @@ import { executeLlmReply } from "../llmReply";
 export const translateCommand: CommandModule = {
   name: "translate",
   match: (text) => text === "!translate" || text.startsWith("!translate "),
-  async run({ client, message, text, correlationId }) {
+  async run({ client, message, text, correlationId, provider }) {
     const userInput = text.slice("!translate".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -53,7 +53,7 @@ ${userInput}
 
 
     await executeLlmReply({
-      client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "translate",
+      client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "translate", provider,
       auditContext: { correlationId, commandName: "translate", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке ответа перевода в Telegram.",
       llmErrorMessage: "Ошибка при переводе, смотри логи.",

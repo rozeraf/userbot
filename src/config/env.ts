@@ -16,13 +16,26 @@ function apiKeys(listName: string, fallbackName: string): string[] {
     .filter(Boolean))];
 }
 
+function nonNegativeInteger(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`Invalid ${name}: "${raw}" must be a non-negative integer`);
+  }
+  return value;
+}
+
 export function pickRandomApiKey(keys: readonly string[]): string {
   if (keys.length === 0) throw new Error("No API keys configured");
   return keys[Math.floor(Math.random() * keys.length)]!;
 }
 
 const rawProvider = (process.env.LLM_PROVIDER ?? "gemini").trim().toLowerCase();
-const provider: Provider = rawProvider === "cerebras" ? "cerebras" : "gemini";
+if (rawProvider !== "gemini" && rawProvider !== "cerebras") {
+  throw new Error(`Invalid LLM_PROVIDER: "${rawProvider}" must be gemini or cerebras`);
+}
+const provider: Provider = rawProvider;
 
 const tgApiIdRaw = required("TG_API_ID");
 const tgApiId = Number(tgApiIdRaw);
@@ -52,6 +65,8 @@ export const ENV = {
   CEREBRAS_MODEL: process.env.CEREBRAS_MODEL?.trim() || "gpt-oss-120b",
 
   SYSTEM_PROMPT: process.env.SYSTEM_PROMPT?.trim() || "",
+  /** 0 keeps history forever; a positive value deletes older private logs. */
+  DB_RETENTION_DAYS: nonNegativeInteger("DB_RETENTION_DAYS", 0),
 
   LLM_PROVIDER: provider,
 } as const satisfies {
@@ -63,5 +78,6 @@ export const ENV = {
   CEREBRAS_API_KEYS: string[];
   CEREBRAS_MODEL: string;
   SYSTEM_PROMPT: string;
+  DB_RETENTION_DAYS: number;
   LLM_PROVIDER: Provider;
 };

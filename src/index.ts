@@ -85,38 +85,20 @@ async function main() {
   console.log("[tg] already authorized:", authorized);
 
   if (!authorized) {
-    const phone = (await input.text("Номер телефона: ")).trim();
     try {
-      console.log("[tg] sending code...");
-      const sendResult = await client.sendCode(
-        { apiId: ENV.TG_API_ID, apiHash: ENV.TG_API_HASH },
-        phone,
-        false
-      );
-
-      console.log("[tg] sendCode result:", {
-        isCodeViaApp: sendResult.isCodeViaApp,
-        phoneCodeHash: sendResult.phoneCodeHash ? "[present]" : "[empty]",
+      await client.start({
+        phoneNumber: async () => (await input.text("Номер телефона: ")).trim(),
+        phoneCode: async (isCodeViaApp?: boolean) => (await input.text(
+          isCodeViaApp ? "Код из Telegram (в приложении, не SMS): " : "Код из Telegram: "
+        )).trim(),
+        password: async (hint?: string) => await input.password(
+          hint ? `Пароль двухэтапной проверки (${hint}): ` : "Пароль двухэтапной проверки: "
+        ),
+        onError: async (err: Error) => {
+          console.error("[tg] auth error:", err);
+          return true;
+        },
       });
-
-      const codePrompt = sendResult.isCodeViaApp
-        ? "Код из Telegram (в приложении, не SMS): "
-        : "Код из Telegram: ";
-
-      const code = (await input.text(codePrompt)).trim();
-      console.log("[tg] code entered:", {
-        len: code.length,
-        numeric: /^\d+$/.test(code),
-      });
-
-      await client.invoke(
-        new Api.auth.SignIn({
-          phoneNumber: phone,
-          phoneCodeHash: sendResult.phoneCodeHash,
-          phoneCode: code,
-        })
-      );
-
       console.log("[tg] sign in ok");
       console.log("Сохрани эту строку в .env как TG_SESSION:");
       console.log(client.session.save());

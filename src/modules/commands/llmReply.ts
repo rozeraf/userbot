@@ -1,4 +1,5 @@
-import { askCurrent, type LlmRequestContext } from "../../core/llm";
+import { askByProvider, type LlmRequestContext } from "../../core/llm";
+import type { Provider } from "../../config/env";
 import { LoggedCommandError, errorMessage } from "../../core/errors";
 import { database } from "../../core/db";
 import { sendLlmResponse } from "../../core/telegram";
@@ -12,6 +13,7 @@ type Options = Pick<CommandContext, "client" | "message"> & {
   llmErrorMessage: string;
   logPrefix: string;
   auditContext?: LlmRequestContext;
+  provider: Provider;
 };
 
 /** Execute an LLM request and deliver its result with consistent error handling. */
@@ -25,11 +27,12 @@ export async function executeLlmReply({
   llmErrorMessage,
   logPrefix,
   auditContext,
+  provider,
 }: Options): Promise<void> {
   let answer: string;
   try {
     const startedAt = Date.now();
-    answer = await askCurrent(prompt, systemInstruction, auditContext);
+    answer = await askByProvider(provider, prompt, systemInstruction, auditContext);
     console.log(`[${logPrefix}] model done inMs:`, Date.now() - startedAt);
   } catch (err) {
     console.error(`[${logPrefix}] error:`, err);

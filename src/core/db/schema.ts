@@ -17,6 +17,29 @@ export const messages = sqliteTable(
   (t) => [
     uniqueIndex("uq_messages_chat_message").on(t.chatId, t.messageId),
     index("idx_messages_chat_telegram_timestamp").on(t.chatId, t.telegramTimestamp),
+    index("idx_messages_timestamp").on(t.timestamp),
+  ]
+);
+
+/** Durable idempotency record for a command message received from Telegram. */
+export const commandExecutions = sqliteTable(
+  "command_executions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    chatId: text("chat_id").notNull(),
+    messageId: integer("message_id").notNull(),
+    commandName: text("command_name").notNull(),
+    correlationId: text("correlation_id").notNull(),
+    provider: text("provider").notNull(),
+    status: text("status", { enum: ["running", "succeeded", "failed"] }).notNull(),
+    error: text("error"),
+    startedAt: integer("started_at").notNull(),
+    finishedAt: integer("finished_at"),
+  },
+  (t) => [
+    uniqueIndex("uq_command_executions_chat_message").on(t.chatId, t.messageId),
+    index("idx_command_executions_status_started").on(t.status, t.startedAt),
+    index("idx_command_executions_started").on(t.startedAt),
   ]
 );
 
@@ -84,3 +107,4 @@ export type NewMessage = typeof messages.$inferInsert;
 export type NewLLMCall = typeof llmCalls.$inferInsert;
 export type NewEvent = typeof eventLog.$inferInsert;
 export type NewStatusSnapshot = typeof statusSnapshot.$inferInsert;
+export type NewCommandExecution = typeof commandExecutions.$inferInsert;

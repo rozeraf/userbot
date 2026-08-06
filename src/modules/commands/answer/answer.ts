@@ -5,7 +5,7 @@ import { executeLlmReply } from "../llmReply";
 export const answerCommand: CommandModule = {
   name: "answer",
   match: (text) => text === "!answer" || text.startsWith("!answer "),
-  async run({ client, message, text, correlationId }) {
+  async run({ client, message, text, correlationId, provider }) {
     const userPrompt = text.slice("!answer".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -33,7 +33,7 @@ export const answerCommand: CommandModule = {
     console.log("[answer] prompt length:", prompt.length);
 
     await executeLlmReply({
-      client, message, prompt, replyToId: replied?.id, logPrefix: "answer",
+      client, message, prompt, replyToId: replied?.id, logPrefix: "answer", provider,
       auditContext: { correlationId, commandName: "answer", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке ответа в Telegram.",
       llmErrorMessage: "Ошибка при обращении к LLM, смотри логи.",
