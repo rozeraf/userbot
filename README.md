@@ -98,6 +98,28 @@ bun run index.ts
 bun start
 ```
 
+### Запуск через systemd (user service)
+
+Unit рассчитан на пользователя `raf` и текущий путь репозитория. Убедись, что
+`.env` заполнен и имеет права доступа только для владельца, затем установи unit:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp systemd/tg-gemini-userbot.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now tg-gemini-userbot
+```
+
+Проверка и просмотр логов:
+
+```bash
+systemctl --user status tg-gemini-userbot
+journalctl --user -u tg-gemini-userbot -f
+```
+
+Чтобы сервис продолжал работать после logout, один раз выполни
+`loginctl enable-linger raf`.
+
 ---
 
 ## Структура проекта
