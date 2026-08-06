@@ -5,6 +5,7 @@ import { COMMANDS } from "../commands";
 import { database } from "../../core/db";
 import { randomBytes } from "crypto";
 import { errorMessage, isLoggedCommandError } from "../../core/errors";
+import { consumeServiceMessage } from "../../core/telegram";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
@@ -23,8 +24,24 @@ function resolveEntityName(entity: unknown): string | undefined {
   return undefined;
 }
 
-// Sequential queue to guarantee command execution order exactly matching arrival order
-let commandQueue = Promise.resolve();
+// Commands remain ordered within one chat, while a slow LLM call in one chat does
+// not block unrelated chats. Provider changes are applied when their command runs.
+const commandQueues = new Map<string, Promise<void>>();
+let activeCommands = 0;
+
+function enqueueCommand(chatId: string, job: () => Promise<void>): void {
+  const previous = commandQueues.get(chatId) ?? Promise.resolve();
+  const next = previous
+    .catch((err: unknown) => {
+      console.error("[event] Recovered command queue after an unexpected failure:", err);
+    })
+    .then(job);
+
+  commandQueues.set(chatId, next);
+  void next.finally(() => {
+    if (commandQueues.get(chatId) === next) commandQueues.delete(chatId);
+  });
+}
 
 export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   const message = event.message;
@@ -34,6 +51,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   const chatId = message.chatId?.toString() ?? "";
   const senderId = message.senderId?.toString() ?? "";
   const isOutgoing = message.out ?? false;
+  const isServiceMessage = isOutgoing && consumeServiceMessage(chatId, message.id);
 
   // ── Resolve names in parallel immediately upon arrival ──────────────────────
   const chatPromise = message.getChat()
@@ -46,18 +64,14 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
 
   // Synchronously determine if this is a command to lock its order in the queue
   let matchedCmd: typeof COMMANDS[number] | undefined;
-  if (isOutgoing && text.startsWith("!")) {
+  if (isOutgoing && !isServiceMessage && text.startsWith("!")) {
     matchedCmd = COMMANDS.find((c) => c.match(text));
   }
 
   if (matchedCmd) {
     const cmd = matchedCmd;
-    // Chain command execution synchronously to secure the execution sequence slot
-    commandQueue = commandQueue
-      .catch((err: unknown) => {
-        console.error("[event] Recovered command queue after an unexpected failure:", err);
-      })
-      .then(async () => {
+    enqueueCommand(chatId, async () => {
+      activeCommands++;
       // 1. Wait for name resolution (which started in parallel when message arrived)
       const chatTitle = await chatPromise;
       const senderName = await senderPromise;
@@ -69,6 +83,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
         senderId,
         text,
         isOutgoing: true,
+        telegramTimestamp: message.date ? message.date * 1000 : null,
         chatTitle:  chatTitle ?? null,
         senderName: senderName ?? null,
       });
@@ -82,7 +97,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
       let correlationId: string | undefined;
       try {
         correlationId = randomBytes(6).toString("hex");
-        database.setQueueState(`executing: ${cmd.name}`);
+        database.setQueueState(`executing: ${activeCommands} command(s)`);
         database.logEvent({
           eventType: "command_start",
           level: "info",
@@ -91,7 +106,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
           metadata: { chatId, chatTitle, text, correlationId, commandName: cmd.name },
         });
 
-        await cmd.run({ client, message, text });
+        await cmd.run({ client, message, text, correlationId });
 
         database.logEvent({
           eventType: "command_success",
@@ -111,11 +126,12 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
           metadata: { chatId, correlationId, commandName: cmd.name, error: errorMessage(err), alreadyLogged },
         });
       } finally {
-        database.setQueueState("idle");
+        activeCommands--;
+        database.setQueueState(activeCommands > 0 ? `executing: ${activeCommands} command(s)` : "idle");
       }
-      });
+    });
   } else {
-    if (isOutgoing && text.startsWith("!")) {
+    if (isOutgoing && !isServiceMessage && text.startsWith("!")) {
       void message.reply({ message: "Неизвестная команда. Используй !help для списка команд." })
         .catch((err) => console.error("[event] failed to send unknown-command reply:", err));
     }
@@ -128,6 +144,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
           senderId,
           text,
           isOutgoing,
+          telegramTimestamp: message.date ? message.date * 1000 : null,
           chatTitle:  chatTitle ?? null,
           senderName: senderName ?? null,
         });

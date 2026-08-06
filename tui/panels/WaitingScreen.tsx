@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import { isDbReady, dbError } from "../core/db";
+import { dbError } from "../core/db";
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -11,15 +11,12 @@ interface Props {
 
 export function WaitingScreen({ width, height }: Props) {
   const [tick, setTick]       = useState(0);
-  const [ready, setReady]     = useState(false);
   const [errMsg, setErrMsg]   = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => {
       setTick((n) => n + 1);
-      // Re-check every half-second in case the bot just started
-      if (isDbReady()) setReady(true);
-      else setErrMsg(dbError());
+      setErrMsg(dbError());
     }, 500);
     return () => clearInterval(t);
   }, []);

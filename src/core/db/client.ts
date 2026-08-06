@@ -15,6 +15,13 @@ if (!fs.existsSync(dbDir)) {
 }
 
 export const sqlite = new Database(dbPath);
+// The database contains private message history. Keep the main file readable
+// only by the current OS user (WAL side files follow the process umask).
+try {
+  fs.chmodSync(dbPath, 0o600);
+} catch (err) {
+  console.warn("[db] Could not restrict database file permissions:", err);
+}
 sqlite.run("PRAGMA journal_mode = WAL;");
 sqlite.run("PRAGMA synchronous = NORMAL;");
 

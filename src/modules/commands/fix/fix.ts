@@ -1,11 +1,11 @@
-import { buildPrompt, preview } from "../../../core/llm/prompt";
+import { buildPrompt } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
 import { executeLlmReply } from "../llmReply";
 
 export const fixCommand: CommandModule = {
   name: "fix",
   match: (text) => text === "!fix" || text.startsWith("!fix "),
-  async run({ client, message, text }) {
+  async run({ client, message, text, correlationId }) {
     const userPrompt = text.slice("!fix".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -40,10 +40,10 @@ Rules:
 - If the original text is correct and has no errors, output the original text exactly.`;
 
     console.log("[fix] prompt length:", prompt.length);
-    console.log("[fix] prompt preview:", preview(prompt, 220));
 
     await executeLlmReply({
       client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "fix",
+      auditContext: { correlationId, commandName: "fix", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке исправленного текста в Telegram.",
       llmErrorMessage: "Ошибка при обращении к LLM, смотри логи.",
     });

@@ -4,6 +4,7 @@ export type CommandContext = {
   client: TelegramClient;
   message: Api.Message;
   text: string;
+  correlationId?: string;
 };
 
 export type CommandModule = {

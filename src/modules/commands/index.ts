@@ -1,31 +1,24 @@
-import fs from "fs";
-import path from "path";
 import type { CommandModule } from "./types";
+import answer from "./answer/init";
+import explain from "./explain/init";
+import fix from "./fix/init";
+import help from "./help/init";
+import provider from "./provider/init";
+import remind from "./remind/init";
+import status from "./status/init";
+import summarize from "./summarize/init";
+import translate from "./translate/init";
 
-const COMMANDS: CommandModule[] = [];
-
-const currentDir = import.meta.dirname;
-
-// Read all items in the current directory to find command subfolders
-const items = fs.readdirSync(currentDir);
-
-for (const item of items) {
-  const itemPath = path.join(currentDir, item);
-  if (fs.statSync(itemPath).isDirectory()) {
-    const initPath = path.join(itemPath, "init.ts");
-    if (fs.existsSync(initPath)) {
-      try {
-        const module = (await import(`./${item}/init.ts`)) as { default?: CommandModule };
-        const command = module.default;
-        if (command && typeof command.match === "function" && typeof command.run === "function") {
-          COMMANDS.push(command);
-          console.log(`[commands] Loaded module: ${command.name}`);
-        }
-      } catch (err) {
-        console.error(`[commands] Failed to load module in ${item}:`, err);
-      }
-    }
-  }
-}
-
-export { COMMANDS };
+// Explicit ordering makes command matching deterministic and turns a broken
+// import into a startup failure instead of silently dropping functionality.
+export const COMMANDS: CommandModule[] = [
+  answer,
+  explain,
+  fix,
+  help,
+  provider,
+  remind,
+  status,
+  summarize,
+  translate,
+];

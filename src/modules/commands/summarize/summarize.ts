@@ -1,11 +1,11 @@
-import { buildPrompt, preview } from "../../../core/llm/prompt";
+import { buildPrompt } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
 import { executeLlmReply } from "../llmReply";
 
 export const summarizeCommand: CommandModule = {
   name: "summarize",
   match: (text) => text === "!summarize" || text.startsWith("!summarize "),
-  async run({ client, message, text }) {
+  async run({ client, message, text, correlationId }) {
     const userPrompt = text.slice("!summarize".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -40,10 +40,10 @@ Rules:
 - Write the summary in the same language as the original text.`;
 
     console.log("[summarize] prompt length:", prompt.length);
-    console.log("[summarize] prompt preview:", preview(prompt, 220));
 
     await executeLlmReply({
       client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "summarize",
+      auditContext: { correlationId, commandName: "summarize", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке суммаризации в Telegram.",
       llmErrorMessage: "Ошибка при обращении к LLM, смотри логи.",
     });

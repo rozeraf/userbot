@@ -48,7 +48,7 @@ export function loadChats(): ChatSummary[] | null {
   return read((db) => db.all<{ chatId: string; chatTitle: string | null; lastTs: number; count: number }>(
     sql`SELECT chat_id as chatId,
                MAX(chat_title) as chatTitle,
-               MAX(timestamp) as lastTs,
+               MAX(COALESCE(telegram_timestamp, timestamp)) as lastTs,
                COUNT(*) as count
         FROM messages
         GROUP BY chat_id
@@ -66,7 +66,7 @@ export function loadMessages(chatId: string): MessageRow[] | null {
   return read((db) => db.select()
     .from(messages)
     .where(eq(messages.chatId, chatId))
-    .orderBy(desc(messages.id))
+    .orderBy(desc(messages.telegramTimestamp), desc(messages.id))
     .limit(300)
     .all()
     .map((row) => ({
@@ -122,10 +122,12 @@ export function loadCommandEvents() {
 
 export function loadStatusSnapshot() {
   return read((db) => {
-    const messagesCount = db.select({ count: sql<number>`count(*)` }).from(messages).all()[0]?.count ?? 0;
-    const llmCallsCount = db.select({ count: sql<number>`count(*)` }).from(llmCalls).all()[0]?.count ?? 0;
-    const eventsCount = db.select({ count: sql<number>`count(*)` }).from(eventLog).all()[0]?.count ?? 0;
     const snapshot = db.select().from(statusSnapshot).where(eq(statusSnapshot.id, 1)).all()[0] ?? null;
-    return { messagesCount, llmCallsCount, eventsCount, snapshot };
+    return {
+      messagesCount: snapshot ? snapshot.incomingCount + snapshot.outgoingCount : 0,
+      llmCallsCount: snapshot?.aiRequestCount ?? 0,
+      eventsCount: snapshot?.eventCount ?? 0,
+      snapshot,
+    };
   });
 }

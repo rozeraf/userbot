@@ -21,7 +21,8 @@ process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 process.on("beforeExit", () => database.close());
 
-// Global process error catchers to prevent bot crashes on network failures
+// Rejections can be logged and observed; an uncaught exception leaves the
+// process state unreliable, so it is persisted and then the process exits.
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
   database.logEvent({
@@ -43,6 +44,7 @@ process.on("uncaughtException", (error) => {
     metadata: { stack: error.stack },
   });
   database.flush();
+  shutdown(1);
 });
 
 async function main() {
@@ -84,8 +86,6 @@ async function main() {
 
   if (!authorized) {
     const phone = (await input.text("Номер телефона: ")).trim();
-    console.log("[tg] phone entered:", phone);
-
     try {
       console.log("[tg] sending code...");
       const sendResult = await client.sendCode(

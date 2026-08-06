@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const messages = sqliteTable(
   "messages",
@@ -8,12 +8,16 @@ export const messages = sqliteTable(
     chatId:     text("chat_id").notNull(),
     senderId:   text("sender_id"),
     text:       text("text"),
+    telegramTimestamp: integer("telegram_timestamp"),
     timestamp:  integer("timestamp").notNull(),
     isOutgoing: integer("is_outgoing", { mode: "boolean" }).notNull(),
     chatTitle:  text("chat_title"),   // denormalized: resolved at log time
     senderName: text("sender_name"),  // denormalized: resolved at log time
   },
-  (t) => [index("idx_messages_chat_timestamp").on(t.chatId, t.timestamp)]
+  (t) => [
+    uniqueIndex("uq_messages_chat_message").on(t.chatId, t.messageId),
+    index("idx_messages_chat_telegram_timestamp").on(t.chatId, t.telegramTimestamp),
+  ]
 );
 
 export const llmCalls = sqliteTable(
@@ -21,13 +25,21 @@ export const llmCalls = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    correlationId: text("correlation_id"),
+    commandName: text("command_name"),
+    chatId: text("chat_id"),
+    messageId: integer("message_id"),
     prompt: text("prompt").notNull(),
     response: text("response"),
     latencyMs: integer("latency_ms").notNull(),
     error: text("error"),
     timestamp: integer("timestamp").notNull(),
   },
-  (t) => [index("idx_llm_calls_timestamp").on(t.timestamp)]
+  (t) => [
+    index("idx_llm_calls_timestamp").on(t.timestamp),
+    index("idx_llm_calls_correlation").on(t.correlationId),
+  ]
 );
 
 export const eventLog = sqliteTable(
@@ -41,7 +53,11 @@ export const eventLog = sqliteTable(
     metadata: text("metadata"), // JSON string
     timestamp: integer("timestamp").notNull(),
   },
-  (t) => [index("idx_event_log_timestamp").on(t.timestamp)]
+  (t) => [
+    index("idx_event_log_timestamp").on(t.timestamp),
+    index("idx_event_log_category_id").on(t.category, t.id),
+    index("idx_event_log_type_id").on(t.eventType, t.id),
+  ]
 );
 
 export const statusSnapshot = sqliteTable(
@@ -56,6 +72,7 @@ export const statusSnapshot = sqliteTable(
     outgoingCount: integer("outgoing_count").notNull(),
     aiRequestCount: integer("ai_request_count").notNull(),
     errorCount: integer("error_count").notNull(),
+    eventCount: integer("event_count").notNull(),
     queueState: text("queue_state").notNull(),
     memoryMb: integer("memory_mb").notNull(),
     updatedAt: integer("updated_at").notNull(),
@@ -67,4 +84,3 @@ export type NewMessage = typeof messages.$inferInsert;
 export type NewLLMCall = typeof llmCalls.$inferInsert;
 export type NewEvent = typeof eventLog.$inferInsert;
 export type NewStatusSnapshot = typeof statusSnapshot.$inferInsert;
-

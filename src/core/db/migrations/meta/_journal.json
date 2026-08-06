@@ -22,6 +22,13 @@
       "when": 1786033200000,
       "tag": "0002_messages_names",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786034853952,
+      "tag": "0003_integrity_and_traceability",
+      "breakpoints": true
     }
   ]
 }

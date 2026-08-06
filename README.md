@@ -133,7 +133,7 @@ src/
 drizzle.config.ts               # Конфиг drizzle-kit
 ```
 
-Каждый модуль команды — изолированная папка с `init.ts` (экспортирует `CommandModule`) и файлом логики. Новая команда добавляется без правки реестра — папка подхватывается автоматически.
+Каждый модуль команды — изолированная папка с `init.ts` (экспортирует `CommandModule`) и файлом логики. Новую команду нужно явно добавить в `src/modules/commands/index.ts`: это фиксирует порядок сопоставления и не позволяет незаметно пропустить ошибку загрузки.
 
 ---
 
@@ -147,12 +147,13 @@ drizzle.config.ts               # Конфиг drizzle-kit
 
 | Колонка | Тип | Описание |
 |---|---|---|
-| `message_id` | integer | ID сообщения в Telegram |
+| `message_id` | integer | ID сообщения в Telegram; уникален вместе с `chat_id` |
 | `chat_id` | text | ID чата |
 | `sender_id` | text | ID отправителя |
 | `text` | text | Текст сообщения |
 | `is_outgoing` | boolean | Исходящее (`true`) или входящее |
-| `timestamp` | integer | Unix ms |
+| `timestamp` | integer | Локальное время журналирования, Unix ms |
+| `telegram_timestamp` | integer | Время сообщения Telegram, Unix ms |
 
 Индекс: `(chat_id, timestamp)`
 
@@ -161,6 +162,8 @@ drizzle.config.ts               # Конфиг drizzle-kit
 | Колонка | Тип | Описание |
 |---|---|---|
 | `provider` | text | `gemini` или `cerebras` |
+| `model` | text | Использованная модель |
+| `correlation_id` | text | Связь с событием выполнения команды |
 | `prompt` | text | Полный промпт |
 | `response` | text | Ответ модели (null при ошибке) |
 | `latency_ms` | integer | Время ответа, мс |
@@ -230,7 +233,7 @@ SQLite работает в режиме **WAL** (Write-Ahead Logging) с `synchr
 
 ### Очередь команд
 
-`onNewMessage` выстраивает команды в последовательную цепочку Promise (`commandQueue`). Это исключает гонку при параллельном получении нескольких команд подряд.
+Команды одного чата выполняются последовательно; медленный запрос в одном чате не блокирует команды в других чатах.
 
 ### Таймаут LLM
 

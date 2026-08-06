@@ -1,11 +1,10 @@
-import { preview } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
 import { executeLlmReply } from "../llmReply";
 
 export const translateCommand: CommandModule = {
   name: "translate",
   match: (text) => text === "!translate" || text.startsWith("!translate "),
-  async run({ client, message, text }) {
+  async run({ client, message, text, correlationId }) {
     const userInput = text.slice("!translate".length).trim();
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
@@ -52,10 +51,10 @@ Command input:
 ${userInput}
 """`;
 
-    console.log("[translate] prompt preview:", preview(prompt, 220));
 
     await executeLlmReply({
       client, message, prompt, systemInstruction, replyToId: replied?.id, logPrefix: "translate",
+      auditContext: { correlationId, commandName: "translate", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке ответа перевода в Telegram.",
       llmErrorMessage: "Ошибка при переводе, смотри логи.",
     });

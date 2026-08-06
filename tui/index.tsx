@@ -88,6 +88,7 @@ function TuiApp() {
   const { stdout } = useStdout();
   const [termRows, setTermRows] = useState(stdout.rows ?? 40);
   const [termCols, setTermCols] = useState(stdout.columns ?? 120);
+  const [dbReady, setDbReady] = useState(() => isDbReady());
   useEffect(() => {
     const onResize = () => {
       setTermRows(stdout.rows ?? 40);
@@ -96,6 +97,14 @@ function TuiApp() {
     stdout.on("resize", onResize);
     return () => { stdout.off("resize", onResize); };
   }, [stdout]);
+
+  useEffect(() => {
+    if (dbReady) return;
+    const interval = setInterval(() => {
+      if (isDbReady()) setDbReady(true);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [dbReady]);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -206,7 +215,7 @@ function TuiApp() {
     queueFocused ? "QUEUE [Tab→]" :
     "MAIN [Tab→]";
 
-  if (!isDbReady()) {
+  if (!dbReady) {
     return <WaitingScreen width={termCols} height={termRows} />;
   }
 

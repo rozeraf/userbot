@@ -1,7 +1,7 @@
-import { askCurrent } from "../../core/llm";
-import { preview } from "../../core/llm/prompt";
+import { askCurrent, type LlmRequestContext } from "../../core/llm";
 import { LoggedCommandError, errorMessage } from "../../core/errors";
 import { database } from "../../core/db";
+import { sendLlmResponse } from "../../core/telegram";
 import type { CommandContext } from "./types";
 
 type Options = Pick<CommandContext, "client" | "message"> & {
@@ -11,6 +11,7 @@ type Options = Pick<CommandContext, "client" | "message"> & {
   sendErrorMessage: string;
   llmErrorMessage: string;
   logPrefix: string;
+  auditContext?: LlmRequestContext;
 };
 
 /** Execute an LLM request and deliver its result with consistent error handling. */
@@ -23,13 +24,13 @@ export async function executeLlmReply({
   sendErrorMessage,
   llmErrorMessage,
   logPrefix,
+  auditContext,
 }: Options): Promise<void> {
   let answer: string;
   try {
     const startedAt = Date.now();
-    answer = await askCurrent(prompt, systemInstruction);
+    answer = await askCurrent(prompt, systemInstruction, auditContext);
     console.log(`[${logPrefix}] model done inMs:`, Date.now() - startedAt);
-    console.log(`[${logPrefix}] answer preview:`, preview(answer, 200));
   } catch (err) {
     console.error(`[${logPrefix}] error:`, err);
     try {
@@ -41,10 +42,7 @@ export async function executeLlmReply({
   }
 
   try {
-    await client.sendMessage(message.chatId!, {
-      message: answer,
-      ...(replyToId ? { replyTo: replyToId } : {}),
-    });
+    await sendLlmResponse(client, message.chatId!, answer, replyToId);
   } catch (err) {
     console.error(`[${logPrefix}] telegram send message error:`, err);
     database.logEvent({

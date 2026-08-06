@@ -26,8 +26,14 @@ let eventLogBuffer: NewEvent[]   = [];
 
 const FLUSH_INTERVAL_MS = 1000; // periodic flush and status snapshot tick every 1 s
 const MAX_BUFFER_SIZE  = 50;
+const MAX_BUFFERED_RECORDS = 10_000;
+const MAX_FLUSH_BACKOFF_MS = 30_000;
 let tickInterval: ReturnType<typeof setInterval> | null = null;
 let isClosed = false;
+let consecutiveFlushFailures = 0;
+let nextFlushAt = 0;
+let droppedRecords = 0;
+let lastDropWarningAt = 0;
 
 // ── In-Memory Counters & Status ───────────────────────────────────────────────
 
@@ -35,6 +41,7 @@ let incomingCount = 0;
 let outgoingCount = 0;
 let aiRequestCount = 0;
 let errorCount = 0;
+let eventCount = 0;
 
 let botStatus: "active" | "connecting" | "disconnected" = "connecting";
 let connectedSince: number | null = null;
@@ -70,6 +77,9 @@ try {
     .all()[0];
   
   errorCount = (errorLlm?.count ?? 0) + (errorEvents?.count ?? 0);
+
+  const eventTotal = db.select({ count: sql<number>`count(*)` }).from(eventLog).all()[0];
+  if (eventTotal) eventCount = eventTotal.count;
 } catch (err) {
   console.error("[db] Failed to load initial counters:", err);
 }
@@ -107,6 +117,7 @@ export const database = {
   },
 
   logMessage(msg: PendingMessage) {
+    if (!canBuffer()) return;
     if (msg.isOutgoing) {
       outgoingCount++;
     } else {
@@ -118,6 +129,7 @@ export const database = {
   },
 
   logLLMCall(call: PendingLLMCall) {
+    if (!canBuffer()) return;
     aiRequestCount++;
     if (call.error) {
       errorCount++;
@@ -128,6 +140,8 @@ export const database = {
   },
 
   logEvent(event: PendingEvent) {
+    if (!canBuffer()) return;
+    eventCount++;
     // LLM failures already increment the counter in logLLMCall().
     if (event.level === "error" && event.category !== "llm") {
       errorCount++;
@@ -157,6 +171,7 @@ export const database = {
           outgoingCount,
           aiRequestCount,
           errorCount,
+          eventCount,
           queueState,
           memoryMb,
           updatedAt: Date.now(),
@@ -172,6 +187,7 @@ export const database = {
             outgoingCount,
             aiRequestCount,
             errorCount,
+            eventCount,
             queueState,
             memoryMb,
             updatedAt: Date.now(),
@@ -183,8 +199,9 @@ export const database = {
     }
   },
 
-  flush() {
-    if (!messageBuffer.length && !llmCallBuffer.length && !eventLogBuffer.length) return;
+  flush(force = false): boolean {
+    if (!messageBuffer.length && !llmCallBuffer.length && !eventLogBuffer.length) return false;
+    if (!force && Date.now() < nextFlushAt) return false;
 
     const msgs   = messageBuffer.splice(0);
     const calls  = llmCallBuffer.splice(0);
@@ -192,15 +209,22 @@ export const database = {
 
     try {
       db.transaction((tx) => {
-        if (msgs.length)   tx.insert(messages).values(msgs).run();
+        if (msgs.length)   tx.insert(messages).values(msgs).onConflictDoNothing().run();
         if (calls.length)  tx.insert(llmCalls).values(calls).run();
         if (events.length) tx.insert(eventLog).values(events).run();
       });
+      consecutiveFlushFailures = 0;
+      nextFlushAt = 0;
+      return true;
     } catch (err) {
       console.error("[db] Batch transaction failed, restoring buffers:", err);
       messageBuffer.unshift(...msgs);
       llmCallBuffer.unshift(...calls);
       eventLogBuffer.unshift(...events);
+      consecutiveFlushFailures++;
+      const backoffMs = Math.min(MAX_FLUSH_BACKOFF_MS, 1_000 * 2 ** Math.min(consecutiveFlushFailures, 5));
+      nextFlushAt = Date.now() + backoffMs;
+      return false;
     }
   },
 
@@ -211,7 +235,7 @@ export const database = {
       clearInterval(tickInterval);
       tickInterval = null;
     }
-    this.flush();
+    this.flush(true);
     this.updateSnapshot();
     closeDb();
   },
@@ -224,4 +248,17 @@ function checkFlush() {
   if (total >= MAX_BUFFER_SIZE) {
     database.flush();
   }
+}
+
+function canBuffer(): boolean {
+  const total = messageBuffer.length + llmCallBuffer.length + eventLogBuffer.length;
+  if (total < MAX_BUFFERED_RECORDS) return true;
+
+  droppedRecords++;
+  const now = Date.now();
+  if (now - lastDropWarningAt >= 30_000) {
+    lastDropWarningAt = now;
+    console.error(`[db] Logging buffer is full; dropped ${droppedRecords} record(s). Check database availability and free disk space.`);
+  }
+  return false;
 }

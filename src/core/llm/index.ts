@@ -1,11 +1,27 @@
-import type { Provider } from "../../config/env";
+import { ENV, type Provider } from "../../config/env";
 import { state } from "../state";
 import { askCerebras } from "./cerebras";
 import { askGemini } from "./gemini";
 import { database } from "../db";
 import { errorMessage } from "../errors";
 
-export async function askByProvider(provider: Provider, prompt: string, systemPrompt?: string): Promise<string> {
+export type LlmRequestContext = {
+  correlationId?: string;
+  commandName?: string;
+  chatId?: string;
+  messageId?: number;
+};
+
+function modelFor(provider: Provider): string {
+  return provider === "cerebras" ? ENV.CEREBRAS_MODEL : ENV.GEMINI_MODEL;
+}
+
+export async function askByProvider(
+  provider: Provider,
+  prompt: string,
+  systemPrompt?: string,
+  context: LlmRequestContext = {},
+): Promise<string> {
   console.log("[llm] activeProvider:", provider);
   const t0 = Date.now();
   try {
@@ -16,6 +32,8 @@ export async function askByProvider(provider: Provider, prompt: string, systemPr
     const latencyMs = Date.now() - t0;
     database.logLLMCall({
       provider,
+      model: modelFor(provider),
+      ...context,
       prompt,
       response,
       latencyMs,
@@ -32,6 +50,8 @@ export async function askByProvider(provider: Provider, prompt: string, systemPr
     const latencyMs = Date.now() - t0;
     database.logLLMCall({
       provider,
+      model: modelFor(provider),
+      ...context,
       prompt,
       response: null,
       latencyMs,
@@ -47,6 +67,10 @@ export async function askByProvider(provider: Provider, prompt: string, systemPr
   }
 }
 
-export async function askCurrent(prompt: string, systemPrompt?: string): Promise<string> {
-  return await askByProvider(state.getProvider(), prompt, systemPrompt);
+export async function askCurrent(
+  prompt: string,
+  systemPrompt?: string,
+  context?: LlmRequestContext,
+): Promise<string> {
+  return await askByProvider(state.getProvider(), prompt, systemPrompt, context);
 }
