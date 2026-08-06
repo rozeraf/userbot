@@ -365,7 +365,8 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
   const titleColor  = viewMode === "errors" ? "red" : "blue";
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
+         height={height} overflow="hidden">
       {/* ── Title row ── */}
       <Box paddingX={1} justifyContent="space-between">
         <Box>

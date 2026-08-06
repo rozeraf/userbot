@@ -226,7 +226,8 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
   const borderColor = runningCount > 0 ? "yellow" : "blue";
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
+         height={height} overflow="hidden">
       {/* Title */}
       <Box paddingX={1} justifyContent="space-between">
         <Text bold color={borderColor}>

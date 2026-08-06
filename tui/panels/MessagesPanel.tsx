@@ -191,7 +191,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
   const borderColor = isFocused ? "yellow" : "gray";
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
+         height={height} overflow="hidden">
       {/* Title */}
       <Box paddingX={1} justifyContent="space-between">
         <Text bold color="yellow">

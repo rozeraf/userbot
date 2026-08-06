@@ -230,7 +230,8 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
     f === "all" ? "all" : f === "ok" ? "✓ok" : "✗err";
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}>
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
+         height={height} overflow="hidden">
       {/* Title + filters */}
       <Box paddingX={1} justifyContent="space-between">
         <Text bold color="magenta">

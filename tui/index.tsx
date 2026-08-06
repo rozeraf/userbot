@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { render, Box, Text, useInput, useApp } from "ink";
+import { render, Box, Text, useInput, useApp, useStdout } from "ink";
 import { loadTuiConfig, saveTuiConfig } from "./core/config";
 import type { PanelName } from "./core/config";
 import { usePoll } from "./core/usePoll";
@@ -70,6 +70,18 @@ function TuiApp() {
     new Set(initialConfig.visiblePanels)
   );
   const [focus, setFocus] = useState<FocusMode>("main");
+
+  const { stdout } = useStdout();
+  const [termRows, setTermRows] = useState(stdout.rows ?? 40);
+  const [termCols, setTermCols] = useState(stdout.columns ?? 120);
+  useEffect(() => {
+    const onResize = () => {
+      setTermRows(stdout.rows ?? 40);
+      setTermCols(stdout.columns ?? 120);
+    };
+    stdout.on("resize", onResize);
+    return () => { stdout.off("resize", onResize); };
+  }, [stdout]);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -166,6 +178,18 @@ function TuiApp() {
   const logFocused   = focus === "log"      && visiblePanels.has("eventLog");
   const queueFocused = focus === "queue"    && visiblePanels.has("commandQueue");
 
+  // ── Height budget ──────────────────────────────────────────────────────────
+  // Header: 3 rows, padding top+bottom: 2, footer: 3, margin: 1 → 9 fixed rows
+  const CHROME_ROWS = 9;
+  const availH = Math.max(8, termRows - CHROME_ROWS);
+
+  // Right-column panels share available height equally
+  const rightPanelNames = (["messages", "llmCalls", "eventLog", "commandQueue"] as PanelName[])
+    .filter((p) => visiblePanels.has(p));
+  const panelH = rightPanelNames.length > 0
+    ? Math.max(6, Math.floor(availH / rightPanelNames.length))
+    : availH;
+
   const focusLabel =
     msgFocused   ? "MSGS [Tab→]"  :
     llmFocused   ? "LLM [Tab→]"   :
@@ -174,7 +198,7 @@ function TuiApp() {
     "MAIN [Tab→]";
 
   return (
-    <Box flexDirection="column" width="100%" height="100%" padding={1}>
+    <Box flexDirection="column" width={termCols} height={termRows} padding={1} overflow="hidden">
       {/* ── Header ── */}
       <Box borderStyle="single" borderColor="cyan" paddingX={2} marginBottom={1} justifyContent="space-between">
         <Text bold color="cyan">⚡ TG-GEMINI-USERBOT TUI ⚡</Text>
@@ -218,28 +242,28 @@ function TuiApp() {
         )}
 
         {/* Right: stacked panels */}
-        <Box flexDirection="column" flexGrow={1}>
+        <Box flexDirection="column" flexGrow={1} overflow="hidden">
           {visiblePanels.has("messages") && (
-            <Box flexGrow={1} marginBottom={1}>
-              <MessagesPanel isFocused={msgFocused} />
+            <Box height={panelH} overflow="hidden">
+              <MessagesPanel height={panelH} isFocused={msgFocused} />
             </Box>
           )}
 
           {visiblePanels.has("llmCalls") && (
-            <Box flexGrow={1} marginBottom={visiblePanels.has("eventLog") || visiblePanels.has("commandQueue") ? 1 : 0}>
-              <LlmCallsPanel isFocused={llmFocused} />
+            <Box height={panelH} overflow="hidden">
+              <LlmCallsPanel height={panelH} isFocused={llmFocused} />
             </Box>
           )}
 
           {visiblePanels.has("eventLog") && (
-            <Box flexGrow={1} marginBottom={visiblePanels.has("commandQueue") ? 1 : 0}>
-              <EventLogPanel isFocused={logFocused} />
+            <Box height={panelH} overflow="hidden">
+              <EventLogPanel height={panelH} isFocused={logFocused} />
             </Box>
           )}
 
           {visiblePanels.has("commandQueue") && (
-            <Box flexGrow={1}>
-              <CommandQueuePanel isFocused={queueFocused} />
+            <Box height={panelH} overflow="hidden">
+              <CommandQueuePanel height={panelH} isFocused={queueFocused} />
             </Box>
           )}
         </Box>
