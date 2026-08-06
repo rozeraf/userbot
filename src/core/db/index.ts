@@ -1,6 +1,8 @@
 import { db } from "./client";
-import { messages, llmCalls, eventLog } from "./schema";
+import { messages, llmCalls, eventLog, statusSnapshot } from "./schema";
 import type { NewMessage, NewLLMCall, NewEvent } from "./schema";
+import { state } from "../state";
+import { eq, isNotNull, sql } from "drizzle-orm";
 
 // Re-export db and schema for TUI / external consumers
 export { db } from "./client";
@@ -22,24 +24,98 @@ let messageBuffer: NewMessage[] = [];
 let llmCallBuffer: NewLLMCall[]  = [];
 let eventLogBuffer: NewEvent[]   = [];
 
-let flushTimeout: Timer | null = null;
-const MAX_BUFFER_SIZE  = 50;   // flush immediately when total items ≥ this
-const FLUSH_INTERVAL_MS = 1000; // periodic flush every 1 s
+const FLUSH_INTERVAL_MS = 1000; // periodic flush and status snapshot tick every 1 s
+const MAX_BUFFER_SIZE  = 50;
+
+// ── In-Memory Counters & Status ───────────────────────────────────────────────
+
+let incomingCount = 0;
+let outgoingCount = 0;
+let aiRequestCount = 0;
+let errorCount = 0;
+
+let botStatus: "active" | "connecting" | "disconnected" = "connecting";
+let connectedSince: number | null = null;
+let pingMs: number | null = null;
+let queueState: string = "idle";
+
+// Load initial counters from DB
+try {
+  const msgOutgoing = db.select({ count: sql<number>`count(*)` })
+    .from(messages)
+    .where(eq(messages.isOutgoing, true))
+    .all()[0];
+  if (msgOutgoing) outgoingCount = msgOutgoing.count;
+
+  const msgIncoming = db.select({ count: sql<number>`count(*)` })
+    .from(messages)
+    .where(eq(messages.isOutgoing, false))
+    .all()[0];
+  if (msgIncoming) incomingCount = msgIncoming.count;
+
+  const llmCount = db.select({ count: sql<number>`count(*)` })
+    .from(llmCalls)
+    .all()[0];
+  if (llmCount) aiRequestCount = llmCount.count;
+
+  const errorLlm = db.select({ count: sql<number>`count(*)` })
+    .from(llmCalls)
+    .where(isNotNull(llmCalls.error))
+    .all()[0];
+  const errorEvents = db.select({ count: sql<number>`count(*)` })
+    .from(eventLog)
+    .where(eq(eventLog.level, "error"))
+    .all()[0];
+  
+  errorCount = (errorLlm?.count ?? 0) + (errorEvents?.count ?? 0);
+} catch (err) {
+  console.error("[db] Failed to load initial counters:", err);
+}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const database = {
+  setStatus(status: "active" | "connecting" | "disconnected") {
+    botStatus = status;
+    if (status === "active" && !connectedSince) {
+      connectedSince = Date.now();
+    }
+  },
+
+  setPing(ms: number | null) {
+    pingMs = ms;
+  },
+
+  setQueueState(stateStr: string) {
+    queueState = stateStr;
+  },
+
   logMessage(msg: PendingMessage) {
+    if (msg.isOutgoing) {
+      outgoingCount++;
+    } else {
+      incomingCount++;
+    }
+
     messageBuffer.push({ ...msg, timestamp: Date.now() });
     checkFlush();
   },
 
   logLLMCall(call: PendingLLMCall) {
+    aiRequestCount++;
+    if (call.error) {
+      errorCount++;
+    }
+
     llmCallBuffer.push({ ...call, timestamp: Date.now() });
     checkFlush();
   },
 
   logEvent(event: PendingEvent) {
+    if (event.level === "error" || event.category === "error") {
+      errorCount++;
+    }
+
     eventLogBuffer.push({
       ...event,
       metadata: event.metadata != null ? JSON.stringify(event.metadata) : null,
@@ -48,13 +124,50 @@ export const database = {
     checkFlush();
   },
 
+  updateSnapshot() {
+    const provider = state.getProvider();
+    const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+
+    try {
+      db.insert(statusSnapshot)
+        .values({
+          id: 1,
+          status: botStatus,
+          provider,
+          connectedSince,
+          pingMs,
+          incomingCount,
+          outgoingCount,
+          aiRequestCount,
+          errorCount,
+          queueState,
+          memoryMb,
+          updatedAt: Date.now(),
+        })
+        .onConflictDoUpdate({
+          target: statusSnapshot.id,
+          set: {
+            status: botStatus,
+            provider,
+            connectedSince,
+            pingMs,
+            incomingCount,
+            outgoingCount,
+            aiRequestCount,
+            errorCount,
+            queueState,
+            memoryMb,
+            updatedAt: Date.now(),
+          }
+        })
+        .run();
+    } catch (err) {
+      console.error("[db] Failed to update status_snapshot:", err);
+    }
+  },
+
   flush() {
     if (!messageBuffer.length && !llmCallBuffer.length && !eventLogBuffer.length) return;
-
-    if (flushTimeout) {
-      clearTimeout(flushTimeout);
-      flushTimeout = null;
-    }
 
     const msgs   = messageBuffer.splice(0);
     const calls  = llmCallBuffer.splice(0);
@@ -75,7 +188,9 @@ export const database = {
   },
 
   close() {
+    clearInterval(tickInterval);
     this.flush();
+    this.updateSnapshot();
   },
 };
 
@@ -85,19 +200,30 @@ function checkFlush() {
   const total = messageBuffer.length + llmCallBuffer.length + eventLogBuffer.length;
   if (total >= MAX_BUFFER_SIZE) {
     database.flush();
-  } else if (!flushTimeout) {
-    flushTimeout = setTimeout(() => {
-      flushTimeout = null;
-      database.flush();
-    }, FLUSH_INTERVAL_MS);
   }
 }
 
+// Start a permanent interval for periodic flushes and status snapshot updates
+const tickInterval = setInterval(() => {
+  database.flush();
+  database.updateSnapshot();
+}, FLUSH_INTERVAL_MS);
+
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 
-process.on("beforeExit", () => database.flush());
-process.on("exit",       () => database.flush());
+process.on("beforeExit", () => {
+  database.flush();
+  database.updateSnapshot();
+});
+process.on("exit", () => {
+  database.flush();
+  database.updateSnapshot();
+});
 
-const onSignal = () => { database.flush(); process.exit(0); };
+const onSignal = () => {
+  database.flush();
+  database.updateSnapshot();
+  process.exit(0);
+};
 process.on("SIGINT",  onSignal);
 process.on("SIGTERM", onSignal);

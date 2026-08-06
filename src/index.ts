@@ -13,6 +13,7 @@ process.on("unhandledRejection", (reason, promise) => {
   database.logEvent({
     eventType: "process_unhandled_rejection",
     level: "error",
+    category: "error",
     message: String(reason),
   });
   database.flush();
@@ -23,6 +24,7 @@ process.on("uncaughtException", (error) => {
   database.logEvent({
     eventType: "process_uncaught_exception",
     level: "error",
+    category: "error",
     message: error.message || String(error),
     metadata: { stack: error.stack },
   });
@@ -30,9 +32,11 @@ process.on("uncaughtException", (error) => {
 });
 
 async function main() {
+  database.setStatus("connecting");
   database.logEvent({
     eventType: "bot_start",
     level: "info",
+    category: "system",
     message: "Starting tg-gemini-userbot",
     metadata: { hasSession: Boolean(ENV.TG_SESSION) },
   });
@@ -52,9 +56,20 @@ async function main() {
   console.log("[tg] start connect");
   await client.connect();
   console.log("[tg] connected");
+  
+  database.setStatus("active");
+  try {
+    const pingStart = Date.now();
+    await client.getEntity("me");
+    database.setPing(Date.now() - pingStart);
+  } catch (e) {
+    console.warn("[tg] failed to ping Telegram", e);
+  }
+
   database.logEvent({
     eventType: "tg_connected",
     level: "info",
+    category: "client",
     message: "Telegram client connected successfully",
   });
 
@@ -110,6 +125,7 @@ async function main() {
   database.logEvent({
     eventType: "bot_ready",
     level: "info",
+    category: "system",
     message: "Userbot is running and listening for messages",
     metadata: { initialProvider: ENV.LLM_PROVIDER },
   });
@@ -122,9 +138,11 @@ async function main() {
 
 main().catch((err) => {
   console.error("[fatal]", err);
+  database.setStatus("disconnected");
   database.logEvent({
     eventType: "bot_fatal",
     level: "error",
+    category: "error",
     message: err.message || String(err),
     metadata: { stack: err.stack },
   });

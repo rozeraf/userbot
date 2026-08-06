@@ -34,6 +34,7 @@ export const eventLog = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     eventType: text("event_type").notNull(),
     level: text("level", { enum: ["info", "warn", "error"] }).notNull(),
+    category: text("category", { enum: ["system", "client", "server", "llm", "error"] }).notNull().default("system"),
     message: text("message").notNull(),
     metadata: text("metadata"), // JSON string
     timestamp: integer("timestamp").notNull(),
@@ -41,7 +42,27 @@ export const eventLog = sqliteTable(
   (t) => [index("idx_event_log_timestamp").on(t.timestamp)]
 );
 
+export const statusSnapshot = sqliteTable(
+  "status_snapshot",
+  {
+    id: integer("id").primaryKey(), // always 1 for upsert
+    status: text("status").notNull(), // e.g. active | connecting | disconnected
+    provider: text("provider").notNull(),
+    connectedSince: integer("connected_since"),
+    pingMs: integer("ping_ms"),
+    incomingCount: integer("incoming_count").notNull(),
+    outgoingCount: integer("outgoing_count").notNull(),
+    aiRequestCount: integer("ai_request_count").notNull(),
+    errorCount: integer("error_count").notNull(),
+    queueState: text("queue_state").notNull(),
+    memoryMb: integer("memory_mb").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  }
+);
+
 // Infer insert types directly from schema — no manual interfaces needed
 export type NewMessage = typeof messages.$inferInsert;
 export type NewLLMCall = typeof llmCalls.$inferInsert;
 export type NewEvent = typeof eventLog.$inferInsert;
+export type NewStatusSnapshot = typeof statusSnapshot.$inferInsert;
+

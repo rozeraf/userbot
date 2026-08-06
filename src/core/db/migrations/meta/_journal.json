@@ -8,6 +8,13 @@
       "when": 1785961091264,
       "tag": "0000_sad_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786018841708,
+      "tag": "0001_daffy_warpath",
+      "breakpoints": true
     }
   ]
 }

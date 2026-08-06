@@ -41,26 +41,32 @@ export async function onNewMessage(event: NewMessageEvent, client: TelegramClien
     // Queue command execution sequentially
     commandQueue = commandQueue.then(async () => {
       try {
+        database.setQueueState(`executing: ${command.name}`);
         database.logEvent({
           eventType: "command_start",
           level: "info",
+          category: "client",
           message: `Executing command: ${command.name}`,
           metadata: { chatId, text },
         });
 
         await command.run({ client, message, text });
 
+        database.setQueueState("idle");
         database.logEvent({
           eventType: "command_success",
           level: "info",
+          category: "client",
           message: `Successfully executed command: ${command.name}`,
           metadata: { chatId },
         });
       } catch (err: any) {
         console.error(`[event] Error executing command "${command.name}":`, err);
+        database.setQueueState("idle");
         database.logEvent({
           eventType: "command_error",
           level: "error",
+          category: "error",
           message: `Error executing command "${command.name}": ${err.message || String(err)}`,
           metadata: { chatId, error: String(err) },
         });

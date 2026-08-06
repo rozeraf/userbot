@@ -21,6 +21,7 @@ export const providerCommand: CommandModule = {
       database.logEvent({
         eventType: "provider_changed",
         level: "info",
+        category: "llm",
         message: "LLM provider switched to gemini",
         metadata: { provider: "gemini" },
       });
@@ -46,6 +47,7 @@ export const providerCommand: CommandModule = {
       database.logEvent({
         eventType: "provider_changed",
         level: "info",
+        category: "llm",
         message: "LLM provider switched to cerebras",
         metadata: { provider: "cerebras" },
       });
