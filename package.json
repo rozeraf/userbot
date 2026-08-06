@@ -7,14 +7,20 @@
     "bun": ">=1.0.0"
   },
   "scripts": {
-    "start": "bun run index.ts"
+    "start": "bun run index.ts",
+    "tui": "bun run tui/index.tsx"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
+    "ink": "^7.1.1",
+    "ink-select-input": "^6.2.0",
+    "ink-text-input": "^6.0.0",
     "input": "^1.0.1",
+    "react": "^19.2.8",
     "telegram": "^2.22.2"
   },
   "devDependencies": {
+    "@types/react": "^19.2.18",
     "drizzle-kit": "^0.31.10"
   }
 }
