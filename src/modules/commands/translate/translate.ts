@@ -97,7 +97,7 @@ ${userInput}
       } catch (replyErr) {
         console.error("[translate] failed to send error reply:", replyErr);
       }
-      return true;
+      throw err;
     }
   },
 };

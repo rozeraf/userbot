@@ -134,6 +134,29 @@ async function main() {
     (event) => onNewMessage(event, client),
     new NewMessage({})
   );
+
+  // Periodic ping to Telegram every 15 seconds
+  const pingInterval = setInterval(async () => {
+    if (client.connected) {
+      try {
+        const start = Date.now();
+        await client.invoke(new Api.updates.GetState());
+        const latency = Date.now() - start;
+        database.setPing(latency);
+      } catch (err) {
+        console.error("[tg] ping failed:", err);
+        database.setPing(null);
+        database.logEvent({
+          eventType: "tg_ping_error",
+          level: "error",
+          category: "error",
+          message: `Telegram ping failed: ${err instanceof Error ? err.message : String(err)}`
+        });
+      }
+    }
+  }, 15000);
+
+  pingInterval.unref(); // Prevent keeping the event loop active
 }
 
 main().catch((err) => {

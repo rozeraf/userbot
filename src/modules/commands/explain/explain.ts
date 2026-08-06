@@ -85,7 +85,7 @@ Rules:
       } catch (replyErr) {
         console.error("[explain] failed to send error reply:", replyErr);
       }
-      return true;
+      throw err;
     }
   },
 };

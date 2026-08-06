@@ -49,7 +49,7 @@ export const remindCommand: CommandModule = {
       } catch (replyErr) {
         console.error("[remind] failed to send error reply:", replyErr);
       }
-      return true;
+      throw err;
     }
   },
 };

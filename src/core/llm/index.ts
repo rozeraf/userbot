@@ -20,6 +20,12 @@ export async function askByProvider(provider: Provider, prompt: string, systemPr
       latencyMs,
       error: null
     });
+    database.logEvent({
+      eventType: "llm_success",
+      level: "info",
+      category: "llm",
+      message: `LLM request to ${provider} succeeded in ${latencyMs}ms`,
+    });
     return response;
   } catch (err: any) {
     const latencyMs = Date.now() - t0;
@@ -29,6 +35,12 @@ export async function askByProvider(provider: Provider, prompt: string, systemPr
       response: null,
       latencyMs,
       error: err.message || String(err)
+    });
+    database.logEvent({
+      eventType: "llm_error",
+      level: "error",
+      category: "llm",
+      message: `LLM request to ${provider} failed: ${err.message || String(err)}`,
     });
     throw err;
   }

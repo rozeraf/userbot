@@ -76,7 +76,7 @@ export const answerCommand: CommandModule = {
       } catch (replyErr) {
         console.error("[answer] failed to send LLM error reply:", replyErr);
       }
-      return true;
+      throw err;
     }
   },
 };
