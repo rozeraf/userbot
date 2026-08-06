@@ -215,59 +215,48 @@ function TuiApp() {
       </Box>
 
       {/* ── Main Content ── */}
-      <Box flexDirection="row" width="100%" flexGrow={1}>
-        {/* Left: Status snapshot */}
+      <Box flexDirection="row" width="100%" height={availH} overflow="hidden">
+        {/* Left: Status snapshot — fixed width, full height */}
         {visiblePanels.has("status") && (
           <Box borderStyle="round" borderColor={statusPanelColor} flexDirection="column"
-               width={32} paddingX={1} marginRight={1}>
+               width={26} height={availH} paddingX={1} marginRight={1} overflow="hidden">
             <Text bold color={statusPanelColor}>📊 [1] Status</Text>
             <Box flexDirection="column" marginTop={1}>
-              <Text>Status:{" "}<Text bold color={headerStatusColor}>{data.isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text></Text>
-              <Text>Provider: <Text bold color="cyan">{data.provider}</Text></Text>
-              <Text>Uptime:   <Text color="yellow">{uptimeStr}</Text></Text>
-              <Text>Ping:{" "}<Text color={data.pingMs && data.pingMs < 200 ? "green" : "yellow"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text></Text>
+              <Text>Status:{" "}<Text bold color={headerStatusColor}>{data.isStale ? "DISCO" : data.status.toUpperCase()}</Text></Text>
+              <Text>Prov: <Text bold color="cyan">{data.provider}</Text></Text>
+              <Text>Up:   <Text color="yellow">{uptimeStr}</Text></Text>
+              <Text>Ping: <Text color={data.pingMs && data.pingMs < 200 ? "green" : "yellow"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text></Text>
 
-              <Box marginTop={1}><Text bold color="gray">── Counters ──</Text></Box>
-              <Text>Incoming:    <Text color={data.isStale ? "gray" : "white"}>{data.incomingCount}</Text></Text>
-              <Text>Outgoing:    <Text color={data.isStale ? "gray" : "white"}>{data.outgoingCount}</Text></Text>
-              <Text>AI Requests: <Text color={data.isStale ? "gray" : "white"}>{data.aiRequestCount}</Text></Text>
-              <Text>Errors:      <Text color={data.errorCount > 0 ? "red" : "gray"}>{data.errorCount}</Text></Text>
+              <Box marginTop={1}><Text color="gray">─ Counters ─</Text></Box>
+              <Text>In:  <Text color={data.isStale ? "gray" : "white"}>{data.incomingCount}</Text></Text>
+              <Text>Out: <Text color={data.isStale ? "gray" : "white"}>{data.outgoingCount}</Text></Text>
+              <Text>AI:  <Text color={data.isStale ? "gray" : "white"}>{data.aiRequestCount}</Text></Text>
+              <Text>Err: <Text color={data.errorCount > 0 ? "red" : "gray"}>{data.errorCount}</Text></Text>
 
-              <Box marginTop={1}><Text bold color="gray">── System ──</Text></Box>
-              <Text>Queue:  <Text color={data.isStale ? "gray" : data.queueState === "idle" ? "green" : "yellow"}>{data.queueState}</Text></Text>
-              <Text>Memory: <Text color={data.isStale ? "gray" : "white"}>{data.memoryMb} MB</Text></Text>
+              <Box marginTop={1}><Text color="gray">─ System ─</Text></Box>
+              <Text>Q: <Text color={data.isStale ? "gray" : data.queueState === "idle" ? "green" : "yellow"}>{data.queueState}</Text></Text>
+              <Text>Mem: <Text color={data.isStale ? "gray" : "white"}>{data.memoryMb}MB</Text></Text>
 
-              <Box marginTop={1}><Text bold color="gray">── Panels ──</Text></Box>
-              <Text color="gray">[1]Status [2]Msgs [3]LLM</Text>
-              <Text color="gray">[4]Log    [5]Queue</Text>
+              <Box marginTop={1}><Text color="gray">─ Panels ─</Text></Box>
+              <Text color="gray">[1]St [2]Msg [3]LLM</Text>
+              <Text color="gray">[4]Log [5]Queue</Text>
             </Box>
           </Box>
         )}
 
-        {/* Right: stacked panels */}
-        <Box flexDirection="column" flexGrow={1} overflow="hidden">
+        {/* Right: stacked panels, each with exact equal height */}
+        <Box flexDirection="column" flexGrow={1} height={availH} overflow="hidden">
           {visiblePanels.has("messages") && (
-            <Box height={panelH} overflow="hidden">
-              <MessagesPanel height={panelH} isFocused={msgFocused} />
-            </Box>
+            <MessagesPanel height={panelH} isFocused={msgFocused} />
           )}
-
           {visiblePanels.has("llmCalls") && (
-            <Box height={panelH} overflow="hidden">
-              <LlmCallsPanel height={panelH} isFocused={llmFocused} />
-            </Box>
+            <LlmCallsPanel height={panelH} isFocused={llmFocused} />
           )}
-
           {visiblePanels.has("eventLog") && (
-            <Box height={panelH} overflow="hidden">
-              <EventLogPanel height={panelH} isFocused={logFocused} />
-            </Box>
+            <EventLogPanel height={panelH} isFocused={logFocused} />
           )}
-
           {visiblePanels.has("commandQueue") && (
-            <Box height={panelH} overflow="hidden">
-              <CommandQueuePanel height={panelH} isFocused={queueFocused} />
-            </Box>
+            <CommandQueuePanel height={panelH} isFocused={queueFocused} />
           )}
         </Box>
       </Box>
