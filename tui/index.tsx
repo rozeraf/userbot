@@ -5,7 +5,8 @@ import type { PanelName } from "./core/config";
 import { usePoll } from "./core/usePoll";
 import { db, messages, llmCalls, eventLog, statusSnapshot } from "./core/db";
 import { sql } from "drizzle-orm";
-import { EventLogPanel } from "./panels/EventLogPanel";
+import { EventLogPanel }      from "./panels/EventLogPanel";
+import { CommandQueuePanel }  from "./panels/CommandQueuePanel";
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
@@ -36,12 +37,16 @@ function formatUptime(ms: number | null): string {
   const hours   = Math.floor(ms / (1000 * 60 * 60)) % 24;
   const days    = Math.floor(ms / (1000 * 60 * 60 * 24));
   const parts: string[] = [];
-  if (days > 0)                            parts.push(`${days}d`);
-  if (hours > 0   || days > 0)            parts.push(`${hours}h`);
+  if (days > 0)                              parts.push(`${days}d`);
+  if (hours > 0   || days > 0)              parts.push(`${hours}h`);
   if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}m`);
   parts.push(`${seconds}s`);
   return parts.join(" ");
 }
+
+// ── Focus type ─────────────────────────────────────────────────────────────────
+
+type FocusMode = "main" | "log" | "queue";
 
 // ── Main TUI component ─────────────────────────────────────────────────────────
 
@@ -53,10 +58,10 @@ function TuiApp() {
     new Set(initialConfig.visiblePanels)
   );
 
-  // Which panel has keyboard focus: "main" (panel toggles) or "log" (filter / scroll)
-  const [focus, setFocus] = useState<"main" | "log">("main");
+  // Focus cycles: main → log → queue → main
+  const [focus, setFocus] = useState<FocusMode>("main");
 
-  // local clock for client-side uptime ticking
+  // local clock for uptime
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -114,22 +119,32 @@ function TuiApp() {
   // ── Global hotkeys ──────────────────────────────────────────────────────────
 
   useInput((input, key) => {
-    // Always: quit
-    if (input === "q" || (key.ctrl && input === "c")) {
-      exit();
-      return;
-    }
+    if (input === "q" || (key.ctrl && input === "c")) { exit(); return; }
 
-    // Tab toggles focus between main controls and log panel filter mode
+    // Tab cycles focus: main → log → queue → main (skips panels not visible)
     if (key.tab) {
-      setFocus((f) => (f === "main" ? "log" : "main"));
+      setFocus((f) => {
+        if (f === "main")  return visiblePanels.has("eventLog")     ? "log"   : visiblePanels.has("commandQueue") ? "queue" : "main";
+        if (f === "log")   return visiblePanels.has("commandQueue") ? "queue" : "main";
+        return "main";
+      });
       return;
     }
 
-    // Panel visibility toggles — only in main focus mode
+    // Shift+Tab cycles backwards
+    if (key.shift && key.tab) {
+      setFocus((f) => {
+        if (f === "queue") return visiblePanels.has("eventLog")     ? "log"   : "main";
+        if (f === "log")   return "main";
+        return visiblePanels.has("commandQueue") ? "queue" : visiblePanels.has("eventLog") ? "log" : "main";
+      });
+      return;
+    }
+
+    // Panel toggles — only in main focus
     if (focus === "main") {
       const panelMap: Record<string, PanelName> = {
-        "1": "status", "2": "messages", "3": "llmCalls", "4": "eventLog",
+        "1": "status", "2": "messages", "3": "llmCalls", "4": "eventLog", "5": "commandQueue",
       };
       if (input in panelMap) {
         const panelName = panelMap[input]!;
@@ -143,7 +158,13 @@ function TuiApp() {
 
   const headerStatusColor = data.isStale ? "red" : data.status === "active" ? "green" : "yellow";
   const statusPanelColor  = data.isStale ? "red" : "green";
-  const logFocused = focus === "log" && visiblePanels.has("eventLog");
+  const logFocused   = focus === "log"   && visiblePanels.has("eventLog");
+  const queueFocused = focus === "queue" && visiblePanels.has("commandQueue");
+
+  const focusLabel =
+    logFocused   ? "LOG [Tab→]"   :
+    queueFocused ? "QUEUE [Tab→]" :
+    "MAIN [Tab→]";
 
   return (
     <Box flexDirection="column" width="100%" height="100%" padding={1}>
@@ -155,15 +176,16 @@ function TuiApp() {
           {" | "}
           Ping: <Text color={data.pingMs ? "green" : "gray"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text>
           {" | "}
-          <Text color={logFocused ? "yellow" : "gray"}>Focus: {logFocused ? "LOG [Tab]" : "MAIN [Tab]"}</Text>
+          <Text color={focus !== "main" ? "yellow" : "gray"}>Focus: {focusLabel}</Text>
         </Text>
       </Box>
 
       {/* ── Main Content ── */}
       <Box flexDirection="row" width="100%" flexGrow={1}>
-        {/* Left: Status snapshot panel */}
+        {/* Left: Status snapshot */}
         {visiblePanels.has("status") && (
-          <Box borderStyle="round" borderColor={statusPanelColor} flexDirection="column" width={32} paddingX={1} marginRight={1}>
+          <Box borderStyle="round" borderColor={statusPanelColor} flexDirection="column"
+               width={32} paddingX={1} marginRight={1}>
             <Text bold color={statusPanelColor}>📊 [1] Status Snapshot</Text>
             <Box flexDirection="column" marginTop={1}>
               <Text>Status:{" "}<Text bold color={headerStatusColor}>{data.isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text></Text>
@@ -188,27 +210,29 @@ function TuiApp() {
         <Box flexDirection="column" flexGrow={1}>
           {visiblePanels.has("messages") && (
             <Box borderStyle="round" borderColor="yellow" flexGrow={1} paddingX={1}
-                 marginBottom={visiblePanels.has("llmCalls") || visiblePanels.has("eventLog") ? 1 : 0}>
+                 marginBottom={1}>
               <Text bold color="yellow">💬 [2] Message History ({data.messages} rows)</Text>
-              <Box marginTop={1}>
-                <Text color="gray">[Placeholder — Фаза 5]</Text>
-              </Box>
+              <Box marginTop={1}><Text color="gray">[Placeholder — Фаза 7]</Text></Box>
             </Box>
           )}
 
           {visiblePanels.has("llmCalls") && (
             <Box borderStyle="round" borderColor="magenta" flexGrow={1} paddingX={1}
-                 marginBottom={visiblePanels.has("eventLog") ? 1 : 0}>
+                 marginBottom={1}>
               <Text bold color="magenta">🤖 [3] LLM Calls ({data.llmCalls} rows)</Text>
-              <Box marginTop={1}>
-                <Text color="gray">[Placeholder — Фаза 5]</Text>
-              </Box>
+              <Box marginTop={1}><Text color="gray">[Placeholder — Фаза 7]</Text></Box>
             </Box>
           )}
 
           {visiblePanels.has("eventLog") && (
-            <Box flexGrow={1}>
+            <Box flexGrow={1} marginBottom={visiblePanels.has("commandQueue") ? 1 : 0}>
               <EventLogPanel isFocused={logFocused} />
+            </Box>
+          )}
+
+          {visiblePanels.has("commandQueue") && (
+            <Box flexGrow={1}>
+              <CommandQueuePanel isFocused={queueFocused} />
             </Box>
           )}
         </Box>
@@ -217,10 +241,12 @@ function TuiApp() {
       {/* ── Footer ── */}
       <Box borderStyle="single" borderColor="gray" paddingX={2} marginTop={1} justifyContent="space-between">
         {logFocused
-          ? <Text color="yellow">Log: [s/c/r/l/e] filter | ↑↓ cursor | [x] export | [X] batch | [!] errors | [f] freeze | [Tab] back</Text>
-          : <Text color="gray">Toggle: [1] Status | [2] Messages | [3] LLM | [4] Events | [Tab] log focus</Text>
+          ? <Text color="yellow">Log: [s/c/r/l/e] filter | ↑↓ cursor | [x] export | [X] batch | [!] errors | [f] freeze | [Tab]→</Text>
+          : queueFocused
+          ? <Text color="yellow">Queue: ↑↓ navigate | [Tab]→ main</Text>
+          : <Text color="gray">Toggle: [1]Status [2]Msgs [3]LLM [4]Log [5]Queue | [Tab] cycle focus</Text>
         }
-        <Text color="red" bold>Press [q] to Quit</Text>
+        <Text color="red" bold>[q] Quit</Text>
       </Box>
     </Box>
   );

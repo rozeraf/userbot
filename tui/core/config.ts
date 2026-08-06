@@ -5,14 +5,14 @@ import os from "os";
 const CONFIG_DIR = path.join(os.homedir(), ".config", "userbot-tui");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 
-export type PanelName = "status" | "messages" | "llmCalls" | "eventLog";
+export type PanelName = "status" | "messages" | "llmCalls" | "eventLog" | "commandQueue";
 
 export interface TuiConfig {
   visiblePanels: PanelName[];
 }
 
 const DEFAULT_CONFIG: TuiConfig = {
-  visiblePanels: ["status", "messages", "llmCalls", "eventLog"]
+  visiblePanels: ["status", "eventLog", "commandQueue"]
 };
 
 export function loadTuiConfig(): TuiConfig {

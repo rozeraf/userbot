@@ -2,6 +2,7 @@ import { NewMessageEvent } from "telegram/events";
 import type { TelegramClient } from "telegram";
 import { COMMANDS } from "../commands";
 import { database } from "../../core/db";
+import { randomBytes } from "crypto";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
@@ -37,9 +38,12 @@ export async function onNewMessage(event: NewMessageEvent, client: TelegramClien
 
   for (const command of COMMANDS) {
     if (!command.match(text)) continue;
-    
+
     // Queue command execution sequentially
     commandQueue = commandQueue.then(async () => {
+      // Unique ID to correlate start → success/error in TUI
+      const correlationId = randomBytes(6).toString("hex");
+
       try {
         database.setQueueState(`executing: ${command.name}`);
         database.logEvent({
@@ -47,7 +51,7 @@ export async function onNewMessage(event: NewMessageEvent, client: TelegramClien
           level: "info",
           category: "client",
           message: `Executing command: ${command.name}`,
-          metadata: { chatId, text },
+          metadata: { chatId, text, correlationId, commandName: command.name },
         });
 
         await command.run({ client, message, text });
@@ -58,7 +62,7 @@ export async function onNewMessage(event: NewMessageEvent, client: TelegramClien
           level: "info",
           category: "client",
           message: `Successfully executed command: ${command.name}`,
-          metadata: { chatId },
+          metadata: { chatId, correlationId, commandName: command.name },
         });
       } catch (err: any) {
         console.error(`[event] Error executing command "${command.name}":`, err);
@@ -68,7 +72,7 @@ export async function onNewMessage(event: NewMessageEvent, client: TelegramClien
           level: "error",
           category: "error",
           message: `Error executing command "${command.name}": ${err.message || String(err)}`,
-          metadata: { chatId, error: String(err) },
+          metadata: { chatId, correlationId, commandName: command.name, error: String(err) },
         });
       }
     });
