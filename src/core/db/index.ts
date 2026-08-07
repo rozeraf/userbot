@@ -1,5 +1,5 @@
 import { closeDb, db, secureDbFiles, sqlite } from "./client";
-import { messages, llmCalls, eventLog, statusSnapshot, commandExecutions } from "./schema";
+import { chatSummary, messages, llmCalls, eventLog, statusSnapshot, commandExecutions } from "./schema";
 import type { NewMessage, NewLLMCall, NewEvent } from "./schema";
 import { state } from "../state";
 import { ENV } from "../../config/env";
@@ -93,6 +93,13 @@ export const database = {
   start() {
     if (isClosed) throw new Error("Cannot start a closed database");
     if (tickInterval) return;
+
+    // Ensure chat summary is populated on startup if it's empty.
+    const summaryCount = (db.select({ count: sql`count(*)` }).from(chatSummary).all()[0] as any)?.count ?? 0;
+    if (summaryCount === 0) {
+      database.rebuildChatSummary();
+    }
+
     database.pruneOldRecords();
     nextRetentionPruneAt = Date.now() + RETENTION_PRUNE_INTERVAL_MS;
     tickInterval = setInterval(() => {
@@ -103,6 +110,21 @@ export const database = {
         nextRetentionPruneAt = Date.now() + RETENTION_PRUNE_INTERVAL_MS;
       }
     }, FLUSH_INTERVAL_MS);
+  },
+
+  rebuildChatSummary() {
+    db.transaction((tx) => {
+      tx.delete(chatSummary).run();
+      tx.run(sql`
+        INSERT INTO chat_summary (chat_id, chat_title, last_timestamp, message_count)
+        SELECT chat_id,
+               MAX(chat_title),
+               MAX(COALESCE(telegram_timestamp, timestamp)),
+               COUNT(*)
+        FROM messages
+        GROUP BY chat_id
+      `);
+    });
   },
 
   setStatus(status: "active" | "connecting" | "disconnected") {
@@ -246,7 +268,45 @@ export const database = {
 
     try {
       db.transaction((tx) => {
-        if (msgs.length)   tx.insert(messages).values(msgs).onConflictDoNothing().run();
+        if (msgs.length) {
+          // Only update summaries for rows SQLite actually inserted.  Telegram
+          // can redeliver updates, and counting the input buffer here would
+          // make the summary drift from the unique messages table.
+          const insertedMessages = tx.insert(messages).values(msgs)
+            .onConflictDoNothing()
+            .returning({
+              chatId: messages.chatId,
+              chatTitle: messages.chatTitle,
+              telegramTimestamp: messages.telegramTimestamp,
+              timestamp: messages.timestamp,
+            })
+            .all();
+
+          const summaries = new Map<string, { lastTimestamp: number; chatTitle: string | null; messageCount: number }>();
+          for (const message of insertedMessages) {
+            const previous = summaries.get(message.chatId);
+            const timestamp = message.telegramTimestamp ?? message.timestamp;
+            summaries.set(message.chatId, {
+              lastTimestamp: Math.max(previous?.lastTimestamp ?? 0, timestamp),
+              chatTitle: message.chatTitle ?? previous?.chatTitle ?? null,
+              messageCount: (previous?.messageCount ?? 0) + 1,
+            });
+          }
+
+          for (const [chatId, summary] of summaries) {
+            tx.insert(chatSummary)
+              .values({ chatId, ...summary })
+              .onConflictDoUpdate({
+                target: chatSummary.chatId,
+                set: {
+                  chatTitle: sql`COALESCE(${summary.chatTitle}, ${chatSummary.chatTitle})`,
+                  lastTimestamp: sql`MAX(${chatSummary.lastTimestamp}, ${summary.lastTimestamp})`,
+                  messageCount: sql`${chatSummary.messageCount} + ${summary.messageCount}`,
+                },
+              })
+              .run();
+          }
+        }
         if (calls.length)  tx.insert(llmCalls).values(calls).run();
         if (events.length) tx.insert(eventLog).values(events).run();
       });
@@ -273,6 +333,18 @@ export const database = {
     try {
       db.transaction((tx) => {
         tx.delete(messages).where(sql`${messages.timestamp} < ${cutoff}`).run();
+        // Retention is infrequent, so rebuilding once is simpler and keeps the
+        // denormalized TUI summary exact even when a chat is fully removed.
+        tx.delete(chatSummary).run();
+        tx.run(sql`
+          INSERT INTO chat_summary (chat_id, chat_title, last_timestamp, message_count)
+          SELECT chat_id,
+                 MAX(chat_title),
+                 MAX(COALESCE(telegram_timestamp, timestamp)),
+                 COUNT(*)
+          FROM messages
+          GROUP BY chat_id
+        `);
         tx.delete(llmCalls).where(sql`${llmCalls.timestamp} < ${cutoff}`).run();
         tx.delete(eventLog).where(sql`${eventLog.timestamp} < ${cutoff}`).run();
         tx.delete(commandExecutions).where(sql`${commandExecutions.startedAt} < ${cutoff}`).run();

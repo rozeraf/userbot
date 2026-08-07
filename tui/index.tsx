@@ -4,7 +4,7 @@ import { loadTuiConfig, saveTuiConfig } from "./core/config";
 import type { PanelName } from "./core/config";
 import { usePoll } from "./core/usePoll";
 import { isDbReady } from "./core/db";
-import { POLL_SNAPSHOT_MS } from "./core/constants";
+import { POLL_SNAPSHOT_MS, POLL_UNFOCUSED_MULTIPLIER } from "./core/constants";
 import { loadStatusSnapshot } from "./data/queries";
 import { EventLogPanel }     from "./panels/EventLogPanel";
 import { CommandQueuePanel } from "./panels/CommandQueuePanel";
@@ -141,7 +141,7 @@ function TuiApp() {
         isStale,
       };
     },
-    POLL_SNAPSHOT_MS,
+    visiblePanels.has("status") ? POLL_SNAPSHOT_MS : POLL_SNAPSHOT_MS * POLL_UNFOCUSED_MULTIPLIER,
     {
       messages: 0, llmCalls: 0, events: 0,
       status: "loading", provider: "N/A", connectedSince: null,

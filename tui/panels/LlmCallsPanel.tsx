@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadRecentLlmCalls } from "../data/queries";
 import { writeFileSync } from "fs";
-import { POLL_LLMCALLS_MS } from "../core/constants";
+import { POLL_LLMCALLS_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -144,9 +144,9 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
     };
 
     fetch();
-    const id = setInterval(fetch, POLL_LLMCALLS_MS);
+    const id = setInterval(fetch, isFocused ? POLL_LLMCALLS_MS : POLL_LLMCALLS_MS * POLL_UNFOCUSED_MULTIPLIER);
     return () => { active = false; clearInterval(id); };
-  }, []);
+  }, [isFocused]);
 
   // ── Known providers (for filter cycling) ──────────────────────────────────
   const providers = ["all", ...Array.from(new Set(buffer.map((r) => r.provider))).sort()];

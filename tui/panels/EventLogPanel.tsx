@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadErrorEvents, loadEventsAfter } from "../data/queries";
 import { writeFileSync } from "fs";
-import { POLL_EVENTLOG_MS } from "../core/constants";
+import { POLL_EVENTLOG_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -177,9 +177,9 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     };
 
     fetchLive();
-    const id = setInterval(fetchLive, POLL_EVENTLOG_MS);
+    const id = setInterval(fetchLive, isFocused ? POLL_EVENTLOG_MS : POLL_EVENTLOG_MS * POLL_UNFOCUSED_MULTIPLIER);
     return () => { active = false; clearInterval(id); };
-  }, []);
+  }, [isFocused]);
 
   // ── Error-mode fetch (separate query, DESC, limit N) ────────────────────────
   useEffect(() => {
@@ -205,9 +205,9 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     };
 
     fetchErrors();
-    const id = setInterval(fetchErrors, POLL_EVENTLOG_MS);
+    const id = setInterval(fetchErrors, isFocused ? POLL_EVENTLOG_MS : POLL_EVENTLOG_MS * POLL_UNFOCUSED_MULTIPLIER);
     return () => { active = false; clearInterval(id); };
-  }, [viewMode, errorLimit]);
+  }, [viewMode, errorLimit, isFocused]);
 
   // ── Derived view ─────────────────────────────────────────────────────────────
 

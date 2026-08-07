@@ -1,6 +1,6 @@
-import { asc, desc, eq, gt, like, sql } from "drizzle-orm";
+import { asc, desc, eq, gt, like } from "drizzle-orm";
 import { getDb } from "../core/db";
-import { eventLog, llmCalls, messages, statusSnapshot } from "../../src/core/db/schema";
+import { chatSummary, eventLog, llmCalls, messages, statusSnapshot } from "../../src/core/db/schema";
 
 type ReadDb = NonNullable<ReturnType<typeof getDb>>;
 
@@ -8,9 +8,16 @@ function read<T>(query: (db: ReadDb) => T): T | null {
   const db = getDb();
   if (!db) return null;
 
+  const startedAt = performance.now();
   try {
-    return query(db);
-  } catch {
+    const result = query(db);
+    const elapsed = performance.now() - startedAt;
+    if (elapsed > 50) console.error(`[tui/db] slow query: ${elapsed.toFixed(1)}ms`);
+    return result;
+  } catch (err: unknown) {
+    const elapsed = performance.now() - startedAt;
+    const isBusy = err instanceof Error && /SQLITE_BUSY/i.test(err.message);
+    console.error(`[tui/db] query failed after ${elapsed.toFixed(1)}ms${isBusy ? " (SQLITE_BUSY)" : ""}:`, err);
     return null;
   }
 }
@@ -45,20 +52,15 @@ export interface EventRow {
 }
 
 export function loadChats(): ChatSummary[] | null {
-  return read((db) => db.all<{ chatId: string; chatTitle: string | null; lastTs: number; count: number }>(
-    sql`SELECT chat_id as chatId,
-               MAX(chat_title) as chatTitle,
-               MAX(COALESCE(telegram_timestamp, timestamp)) as lastTs,
-               COUNT(*) as count
-        FROM messages
-        GROUP BY chat_id
-        ORDER BY lastTs DESC
-        LIMIT 50`
-  ).map((row) => ({
+  return read((db) => db.select().from(chatSummary)
+    .orderBy(desc(chatSummary.lastTimestamp))
+    .limit(50)
+    .all()
+    .map((row) => ({
     chatId: row.chatId,
     chatTitle: row.chatTitle ?? row.chatId,
-    lastTs: row.lastTs,
-    count: row.count,
+    lastTs: row.lastTimestamp,
+    count: row.messageCount,
   })));
 }
 

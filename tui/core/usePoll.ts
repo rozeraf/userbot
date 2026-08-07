@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 
-export function usePoll<T>(queryFn: () => T | Promise<T>, intervalMs: number, initialValue: T): T {
+export function usePoll<T>(queryFn: () => T | Promise<T>, intervalMs: number | null, initialValue: T): T {
   const [data, setData] = useState<T>(initialValue);
   const queryRef = useRef(queryFn);
   queryRef.current = queryFn;
 
   useEffect(() => {
+    // Keep the last successful value while polling is paused.
+    if (intervalMs == null || intervalMs <= 0) return;
     let active = true;
 
     const execute = async () => {

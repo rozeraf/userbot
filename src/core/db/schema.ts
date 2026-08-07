@@ -21,6 +21,18 @@ export const messages = sqliteTable(
   ]
 );
 
+/** Incrementally maintained chat list metadata for the TUI. */
+export const chatSummary = sqliteTable(
+  "chat_summary",
+  {
+    chatId: text("chat_id").primaryKey(),
+    chatTitle: text("chat_title"),
+    lastTimestamp: integer("last_timestamp").notNull(),
+    messageCount: integer("message_count").notNull(),
+  },
+  (t) => [index("idx_chat_summary_last_timestamp").on(t.lastTimestamp)],
+);
+
 /** Durable idempotency record for a command message received from Telegram. */
 export const commandExecutions = sqliteTable(
   "command_executions",

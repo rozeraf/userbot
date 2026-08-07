@@ -26,7 +26,10 @@ function tryOpenDb() {
 
   try {
     const sqlite = new Database(dbPath, { readonly: true });
-    sqlite.run("PRAGMA busy_timeout = 1000;"); // wait up to 1s on lock
+    // TUI queries run synchronously on Ink's event-loop thread.  A missed poll
+    // is preferable to making keyboard input unresponsive while a writer holds
+    // a lock.
+    sqlite.run("PRAGMA busy_timeout = 50;");
     _db = drizzle(sqlite, { schema });
     _dbReady = true;
     console.error("[tui/db] Connected (read-only):", dbPath);

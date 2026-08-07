@@ -20,3 +20,6 @@ export const POLL_CHATLIST_MS = 2000;
 
 /** Messages panel — message feed for selected chat */
 export const POLL_MSGFEED_MS = 1200;
+
+/** Visible but unfocused panels refresh less often to protect input latency. */
+export const POLL_UNFOCUSED_MULTIPLIER = 4;

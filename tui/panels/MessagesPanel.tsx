@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadChats, loadMessages } from "../data/queries";
-import { POLL_CHATLIST_MS, POLL_MSGFEED_MS } from "../core/constants";
+import { POLL_CHATLIST_MS, POLL_MSGFEED_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,9 +63,9 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     };
 
     fetchChats();
-    const id = setInterval(fetchChats, POLL_CHATLIST_MS);
+    const id = setInterval(fetchChats, isFocused ? POLL_CHATLIST_MS : POLL_CHATLIST_MS * POLL_UNFOCUSED_MULTIPLIER);
     return () => { active = false; clearInterval(id); };
-  }, []);
+  }, [isFocused]);
 
   // ── Poll messages for selected chat ───────────────────────────────────────
   const selectedChat = chats[chatCursor] ?? null;
@@ -84,9 +84,9 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     };
 
     fetchMsgs();
-    const id = setInterval(fetchMsgs, POLL_MSGFEED_MS);
+    const id = setInterval(fetchMsgs, isFocused ? POLL_MSGFEED_MS : POLL_MSGFEED_MS * POLL_UNFOCUSED_MULTIPLIER);
     return () => { active = false; clearInterval(id); };
-  }, [selectedChat?.chatId]);
+  }, [selectedChat?.chatId, isFocused]);
 
   // ── Derived viewport ───────────────────────────────────────────────────────
   // Layout: left chat list 26 cols, right message area fills rest
