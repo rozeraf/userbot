@@ -112,22 +112,37 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
   useInput((input, key) => {
     if (!isFocused) return;
 
-    // Switch sides with Left/Right or Enter
-    if (key.rightArrow || (input === "\r" && side === "chats")) {
+    const isLeft     = key.leftArrow || input === "h";
+    const isRight    = key.rightArrow || input === "l" || (input === "\r" && side === "chats");
+    const isUp       = key.upArrow || input === "k";
+    const isDown     = key.downArrow || input === "j";
+    const isPageUp   = key.pageUp || input === "u" || (key.ctrl && input === "u");
+    const isPageDown = key.pageDown || input === "d" || (key.ctrl && input === "d");
+    const isTop      = input === "g";
+    const isBottom   = input === "G";
+
+    // Switch sides
+    if (isRight) {
       if (chats.length > 0) setSide("messages");
       return;
     }
-    if (key.leftArrow) { setSide("chats"); return; }
-    if (key.escape)    { setSide("chats"); return; }
+    if (isLeft || key.escape) {
+      setSide("chats");
+      return;
+    }
 
     if (side === "chats") {
-      if (key.upArrow)   { setChatCursor((c) => Math.max(0, c - 1)); return; }
-      if (key.downArrow) { setChatCursor((c) => Math.min(chats.length - 1, c + 1)); return; }
+      if (isUp)     { setChatCursor((c) => Math.max(0, c - 1)); return; }
+      if (isDown)   { setChatCursor((c) => Math.min(chats.length - 1, c + 1)); return; }
+      if (isTop)    { setChatCursor(0); return; }
+      if (isBottom) { setChatCursor(chats.length - 1); return; }
     } else {
-      if (key.upArrow)   { setMsgCursor((c) => Math.max(0, c - 1)); return; }
-      if (key.downArrow) { setMsgCursor((c) => Math.min(pageSlice.length - 1, c + 1)); return; }
-      if (key.pageUp)    { setPage((p) => (pageStart > 0 ? p + 1 : p)); return; }
-      if (key.pageDown)  { setPage((p) => Math.max(0, p - 1)); return; }
+      if (isUp)       { setMsgCursor((c) => Math.max(0, c - 1)); return; }
+      if (isDown)     { setMsgCursor((c) => Math.min(pageSlice.length - 1, c + 1)); return; }
+      if (isTop)      { setMsgCursor(0); return; }
+      if (isBottom)   { setMsgCursor(pageSlice.length - 1); return; }
+      if (isPageUp)   { setPage((p) => (pageStart > 0 ? p + 1 : p)); return; }
+      if (isPageDown) { setPage((p) => Math.max(0, p - 1)); return; }
     }
   }, { isActive: isFocused });
 

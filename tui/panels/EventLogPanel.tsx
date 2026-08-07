@@ -287,7 +287,12 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     }
 
     // Scroll / cursor navigation
-    if (key.upArrow) {
+    const isUp       = key.upArrow || input === "k";
+    const isDown     = key.downArrow || input === "j";
+    const isPageUp   = key.pageUp || input === "g" || (key.ctrl && input === "u");
+    const isPageDown = key.pageDown || input === "G" || (key.ctrl && input === "d");
+
+    if (isUp) {
       setFrozen(true);
       setCursor((c) => {
         const base = c !== null ? c : activeList.length - 1;
@@ -296,7 +301,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
       setScrollTop((t) => Math.max(0, t - 1));
       return;
     }
-    if (key.downArrow) {
+    if (isDown) {
       setCursor((c) => {
         const base = c !== null ? c : activeList.length - 1;
         const next = Math.min(activeList.length - 1, base + 1);
@@ -310,13 +315,13 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
       });
       return;
     }
-    if (key.pageUp) {
+    if (isPageUp) {
       setFrozen(true);
       setCursor(0);
       setScrollTop(0);
       return;
     }
-    if (key.pageDown || input === "G") {
+    if (isPageDown) {
       setCursor(null);
       setFrozen(false);
       setScrollTop(maxScroll);

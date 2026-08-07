@@ -197,10 +197,16 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
 
   useInput((input, key) => {
     if (!isFocused) return;
-    if (key.upArrow)   { setCursor((c) => Math.max(0, c - 1));          return; }
-    if (key.downArrow) { setCursor((c) => Math.min(maxCursor, c + 1));  return; }
-    if (key.pageUp)    { setCursor(0);                                   return; }
-    if (key.pageDown)  { setCursor(maxCursor);                           return; }
+
+    const isUp       = key.upArrow || input === "k";
+    const isDown     = key.downArrow || input === "j";
+    const isPageUp   = key.pageUp || input === "g" || (key.ctrl && input === "u");
+    const isPageDown = key.pageDown || input === "G" || (key.ctrl && input === "d");
+
+    if (isUp)       { setCursor((c) => Math.max(0, c - 1));          return; }
+    if (isDown)     { setCursor((c) => Math.min(maxCursor, c + 1));  return; }
+    if (isPageUp)   { setCursor(0);                                   return; }
+    if (isPageDown) { setCursor(maxCursor);                           return; }
   }, { isActive: isFocused });
 
   // ── Render ────────────────────────────────────────────────────────────────

@@ -188,13 +188,20 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
     }
 
     // Navigation
-    if (key.upArrow)   { setCursor((c) => Math.max(0, c - 1));              return; }
-    if (key.downArrow) { setCursor((c) => Math.min(pagSlice.length - 1, c + 1)); return; }
-    if (key.pageUp)    { setPage((p) => Math.max(0, p - 1)); setCursor(0);  return; }
-    if (key.pageDown)  {
+    const isUp       = key.upArrow || input === "k";
+    const isDown     = key.downArrow || input === "j";
+    const isPageUp   = key.pageUp || (key.ctrl && input === "u");
+    const isPageDown = key.pageDown || (key.ctrl && input === "d");
+
+    if (isUp)        { setCursor((c) => Math.max(0, c - 1));              return; }
+    if (isDown)      { setCursor((c) => Math.min(pagSlice.length - 1, c + 1)); return; }
+    if (isPageUp)    { setPage((p) => Math.max(0, p - 1)); setCursor(0);  return; }
+    if (isPageDown)  {
       if ((page + 1) * PAGE_SIZE < filtered.length) { setPage((p) => p + 1); setCursor(0); }
       return;
     }
+    if (input === "g") { setCursor(0); return; }
+    if (input === "G") { setCursor(pagSlice.length - 1); return; }
 
     // Toggle detail view
     if (input === "d" || key.return) { setShowDetail((v) => !v); return; }
