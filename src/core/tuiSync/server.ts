@@ -10,16 +10,33 @@ type ClientSocket = Bun.Socket<undefined>;
 
 export type TuiSyncServer = { close(): void; socketPath: string };
 
-export function startTuiSyncServer(): TuiSyncServer {
+async function removeStaleSocket(socketPath: string): Promise<void> {
+  if (!fs.existsSync(socketPath)) return;
+  try {
+    const socket = await Bun.connect({
+      unix: socketPath,
+      socket: { data() {}, open(socket) { socket.end(); } },
+    });
+    socket.end();
+    throw new Error(`Another tg-userbot instance is already listening on ${socketPath}`);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Another tg-userbot")) throw err;
+    const code = err instanceof Error && "code" in err ? err.code : undefined;
+    if (code !== "ECONNREFUSED" && code !== "ENOENT") throw err;
+    try { fs.unlinkSync(socketPath); } catch (unlinkErr) {
+      if (!(unlinkErr instanceof Error && "code" in unlinkErr && unlinkErr.code === "ENOENT")) throw unlinkErr;
+    }
+  }
+}
+
+export async function startTuiSyncServer(): Promise<TuiSyncServer> {
   const dbInstanceId = db.select({ value: appMeta.value }).from(appMeta)
     .where(eq(appMeta.key, "db_instance_id")).all()[0]?.value;
   if (!dbInstanceId) throw new Error("Missing db_instance_id");
 
   const socketPath = tuiSocketPath();
   fs.mkdirSync(path.dirname(socketPath), { recursive: true, mode: 0o700 });
-  try { fs.unlinkSync(socketPath); } catch (err) {
-    if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) throw err;
-  }
+  await removeStaleSocket(socketPath);
 
   const clients = new Set<ClientSocket>();
   const handshake: SyncHandshake = { protocol: TUI_SYNC_PROTOCOL, schemaVersion: TUI_SYNC_SCHEMA, dbInstanceId };

@@ -53,7 +53,7 @@ process.on("uncaughtException", (error) => {
 
 async function main() {
   database.start();
-  tuiSyncServer = startTuiSyncServer();
+  tuiSyncServer = await startTuiSyncServer();
   database.setStatus("connecting");
   database.logEvent({
     eventType: "bot_start",

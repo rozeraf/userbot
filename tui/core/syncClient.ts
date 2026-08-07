@@ -14,6 +14,7 @@ export function startSyncClient({ dbInstanceId, onWake, onState }: Options): () 
   let socket: Bun.Socket<{ handshaken: boolean; buffer: Buffer }> | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let retryMs = 250;
+  let generation = 0;
 
   const reconnect = () => {
     if (stopped || reconnectTimer) return;
@@ -27,9 +28,10 @@ export function startSyncClient({ dbInstanceId, onWake, onState }: Options): () 
 
   const connect = async () => {
     if (stopped) return;
+    const connectionGeneration = ++generation;
     onState("connecting");
     try {
-      socket = await Bun.connect<{ handshaken: boolean; buffer: Buffer }>({
+      const connected = await Bun.connect<{ handshaken: boolean; buffer: Buffer }>({
         unix: tuiSocketPath(),
         data: { handshaken: false as boolean, buffer: Buffer.alloc(0) },
         socket: {
@@ -45,7 +47,6 @@ export function startSyncClient({ dbInstanceId, onWake, onState }: Options): () 
               if (handshake.protocol !== TUI_SYNC_PROTOCOL || handshake.schemaVersion !== TUI_SYNC_SCHEMA
                   || handshake.dbInstanceId !== dbInstanceId) {
                 onState("incompatible");
-                stopped = true;
                 current.end();
                 return;
               }
@@ -60,19 +61,26 @@ export function startSyncClient({ dbInstanceId, onWake, onState }: Options): () 
             }
             if (chunk.includes(WAKE_BYTE)) onWake();
           },
-          close() { socket = null; reconnect(); },
+          close(current) {
+            if (socket !== current || connectionGeneration !== generation) return;
+            socket = null;
+            reconnect();
+          },
           error(_socket, error) { if (!stopped) console.warn("[tui-sync] socket error:", error.message); },
           connectError() { reconnect(); },
         },
       });
+      if (stopped || connectionGeneration !== generation) connected.end();
+      else socket = connected;
     } catch {
-      reconnect();
+      if (connectionGeneration === generation) reconnect();
     }
   };
 
   void connect();
   return () => {
     stopped = true;
+    generation++;
     if (reconnectTimer) clearTimeout(reconnectTimer);
     socket?.end();
   };
