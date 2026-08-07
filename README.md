@@ -15,7 +15,7 @@ Telegram userbot, работающий под твоим личным аккау
 | `!fix [текст]` | Исправляет орфографию и пунктуацию, сохраняя смысл и тон |
 | `!summarize [текст]` | Создаёт краткое содержание длинного текста или reply-сообщения |
 | `!explain [понятие]` | Объясняет термин или reply-сообщение простым языком |
-| `!remind [время] [текст]` | Устанавливает напоминание через `@longarmraf_bot` |
+| `!remind [время] [текст]` | Устанавливает напоминание через бота из `REMINDER_BOT_USERNAME` |
 | `!gemini` | Переключает активный провайдер на Gemini |
 | `!cerebras` | Переключает активный провайдер на Cerebras |
 | `!status` | Показывает текущий активный провайдер |
@@ -85,6 +85,9 @@ MAX_LLM_PROMPT_GRAPHEMES=30000
 
 # После первой авторизации заполняется автоматически:
 TG_SESSION=
+
+# Необязательно: бот, которому команда !remind пересылает /remind.
+REMINDER_BOT_USERNAME=reminder_bot
 ```
 
 ### 4. Первый запуск (авторизация)
@@ -281,6 +284,7 @@ SQLite работает в режиме **WAL** с `synchronous = FULL`: зап�
 | `TG_API_ID` | ✓ | — | Telegram App ID |
 | `TG_API_HASH` | ✓ | — | Telegram App Hash |
 | `TG_SESSION` | — | `""` | Сохранённая сессия (заполняется после первого входа) |
+| `REMINDER_BOT_USERNAME` | — | `""` | Username Telegram-бота для команды `!remind`, с `@` или без него |
 | `LLM_PROVIDER` | — | `gemini` | Провайдер по умолчанию: `gemini` или `cerebras` |
 | `GEMINI_API_KEY` / `GEMINI_API_KEYS` | если `gemini` | — | Один ключ или список ключей через запятую/новую строку |
 | `GEMINI_MODEL` | — | `gemini-2.0-flash` | Модель Gemini |

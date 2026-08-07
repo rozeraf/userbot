@@ -1,4 +1,5 @@
 import type { CommandModule } from "../types";
+import { ENV } from "../../../config/env";
 
 export const remindCommand: CommandModule = {
   name: "remind",
@@ -22,24 +23,32 @@ export const remindCommand: CommandModule = {
       return true;
     }
 
+    const reminderBot = ENV.REMINDER_BOT_USERNAME;
+    if (!reminderBot) {
+      await message.reply({
+        message: "Команда !remind не настроена: укажи REMINDER_BOT_USERNAME в .env.",
+      });
+      return true;
+    }
+
     try {
-      console.log("[remind] sending forward to @longarmraf_bot");
-      await client.sendMessage("@longarmraf_bot", {
+      console.log(`[remind] sending forward to ${reminderBot}`);
+      await client.sendMessage(reminderBot, {
         message: `/remind ${userInput}`,
       });
 
       try {
         await message.reply({
-          message: `Запрос на напоминание отправлен боту @longarmraf_bot: \`/remind ${userInput}\``,
+          message: `Запрос на напоминание отправлен боту ${reminderBot}: \`/remind ${userInput}\``,
         });
       } catch (replyErr) {
         console.error("[remind] failed to send success reply:", replyErr);
       }
       return true;
     } catch (err) {
-      console.error("[remind] error forwarding to @longarmraf_bot:", err);
+      console.error(`[remind] error forwarding to ${reminderBot}:`, err);
       try {
-        await message.reply({ message: "Ошибка при отправке запроса в @longarmraf_bot." });
+        await message.reply({ message: `Ошибка при отправке запроса в ${reminderBot}.` });
       } catch (replyErr) {
         console.error("[remind] failed to send error reply:", replyErr);
       }
