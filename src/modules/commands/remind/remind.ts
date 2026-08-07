@@ -1,5 +1,5 @@
 import type { CommandModule } from "../types";
-import { ENV } from "../../../config/env";
+import { parseReminderInput } from "./parse";
 
 export const remindCommand: CommandModule = {
   name: "remind",
@@ -12,10 +12,11 @@ export const remindCommand: CommandModule = {
       chatId: message.chatId?.toString?.(),
     });
 
-    if (!userInput) {
+    const parsed = parseReminderInput(userInput);
+    if (!parsed) {
       try {
         await message.reply({
-          message: "Использование:\n!remind [время] [текст]\nПример: !remind 20m Позвонить маме",
+          message: "Использование: !remind <время> <текст>\nЕдиницы: s/с, m/м, h/ч, d/д\nПример: !remind 20m Позвонить маме",
         });
       } catch (replyErr) {
         console.error("[remind] failed to send input validation reply:", replyErr);
@@ -23,32 +24,26 @@ export const remindCommand: CommandModule = {
       return true;
     }
 
-    const reminderBot = ENV.REMINDER_BOT_USERNAME;
-    if (!reminderBot) {
-      await message.reply({
-        message: "Команда !remind не настроена: укажи REMINDER_BOT_USERNAME в .env.",
-      });
-      return true;
-    }
-
     try {
-      console.log(`[remind] sending forward to ${reminderBot}`);
-      await client.sendMessage(reminderBot, {
-        message: `/remind ${userInput}`,
+      const scheduledAt = new Date(Date.now() + parsed.delayMs);
+      console.log("[remind] scheduling message in Saved Messages", { scheduledAt: scheduledAt.toISOString() });
+      await client.sendMessage("me", {
+        message: `⏰ ${parsed.reminderText}`,
+        schedule: Math.floor(scheduledAt.getTime() / 1000),
       });
 
       try {
         await message.reply({
-          message: `Запрос на напоминание отправлен боту ${reminderBot}: \`/remind ${userInput}\``,
+          message: `Напоминание запланировано в «Избранном» на ${scheduledAt.toLocaleString("ru-RU")}.`,
         });
       } catch (replyErr) {
         console.error("[remind] failed to send success reply:", replyErr);
       }
       return true;
     } catch (err) {
-      console.error(`[remind] error forwarding to ${reminderBot}:`, err);
+      console.error("[remind] failed to schedule Saved Messages reminder:", err);
       try {
-        await message.reply({ message: `Ошибка при отправке запроса в ${reminderBot}.` });
+        await message.reply({ message: "Не удалось запланировать напоминание в «Избранном»." });
       } catch (replyErr) {
         console.error("[remind] failed to send error reply:", replyErr);
       }
