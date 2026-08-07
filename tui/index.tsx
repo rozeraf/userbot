@@ -3,7 +3,7 @@ import { render, Box, Text, useInput, useApp, useStdout } from "ink";
 import { loadTuiConfig, saveTuiConfig } from "./core/config";
 import type { PanelName } from "./core/config";
 import { isDbReady } from "./core/db";
-import { RevisionProvider, useRevision } from "./core/revisions";
+import { RevisionProvider, useRevision, useSyncState } from "./core/revisions";
 import { loadStatusSnapshot } from "./data/queries";
 import { EventLogPanel }     from "./panels/EventLogPanel";
 import { CommandQueuePanel } from "./panels/CommandQueuePanel";
@@ -65,6 +65,7 @@ const FOCUS_PANEL: Record<FocusMode, PanelName | null> = {
 
 function TuiApp() {
   const { exit } = useApp();
+  const syncState = useSyncState();
   const initialConfig = loadTuiConfig();
 
   const [visiblePanels, setVisiblePanels] = useState<Set<PanelName>>(
@@ -226,6 +227,8 @@ function TuiApp() {
           <Text bold color={headerStatusColor}>{isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
           {" · "}
           Ping: <Text color={data.pingMs ? "green" : "gray"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text>
+          {" · "}
+          Sync: <Text color={syncState === "live" ? "green" : syncState === "incompatible" ? "red" : "yellow"}>{syncState.toUpperCase()}</Text>
           {" · "}
           <Text color={focus !== "main" ? "yellow" : "gray"}>Focus: {focusLabel}</Text>
           {"  [q]quit"}

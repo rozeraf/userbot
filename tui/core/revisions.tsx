@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { loadTuiRevisions } from "../data/queries";
+import { loadSyncIdentity, loadTuiRevisions } from "../data/queries";
+import { startSyncClient, type SyncState } from "./syncClient";
 
 const REVISION_POLL_MS = 800;
 type RevisionMap = ReadonlyMap<string, number>;
 const RevisionContext = createContext<RevisionMap>(new Map());
+const SyncStateContext = createContext<SyncState>("offline");
 
 function key(resource: string, scope: string): string {
   return `${resource}\0${scope}`;
@@ -17,6 +19,7 @@ function equal(a: RevisionMap, b: RevisionMap): boolean {
 
 export function RevisionProvider({ children }: { children: React.ReactNode }) {
   const [revisions, setRevisions] = useState<RevisionMap>(new Map());
+  const [syncState, setSyncState] = useState<SyncState>("offline");
 
   useEffect(() => {
     let active = true;
@@ -28,10 +31,22 @@ export function RevisionProvider({ children }: { children: React.ReactNode }) {
     };
     reconcile();
     const timer = setInterval(reconcile, REVISION_POLL_MS);
-    return () => { active = false; clearInterval(timer); };
+    const identity = loadSyncIdentity();
+    const stopSync = identity?.db_instance_id
+      ? startSyncClient({ dbInstanceId: identity.db_instance_id, onWake: reconcile, onState: setSyncState })
+      : () => {};
+    return () => { active = false; clearInterval(timer); stopSync(); };
   }, []);
 
-  return <RevisionContext.Provider value={revisions}>{children}</RevisionContext.Provider>;
+  return (
+    <SyncStateContext.Provider value={syncState}>
+      <RevisionContext.Provider value={revisions}>{children}</RevisionContext.Provider>
+    </SyncStateContext.Provider>
+  );
+}
+
+export function useSyncState(): SyncState {
+  return useContext(SyncStateContext);
 }
 
 export function useRevision(resource: string, scope = ""): number {

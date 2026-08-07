@@ -1,6 +1,6 @@
 import { asc, desc, eq, gt } from "drizzle-orm";
 import { getDb } from "../core/db";
-import { chatSummary, commandExecutions, eventLog, llmCalls, messages, statusSnapshot, tuiRevisions } from "../../src/core/db/schema";
+import { appMeta, chatSummary, commandExecutions, eventLog, llmCalls, messages, statusSnapshot, tuiRevisions } from "../../src/core/db/schema";
 
 type ReadDb = NonNullable<ReturnType<typeof getDb>>;
 
@@ -53,6 +53,12 @@ export interface EventRow {
 
 export function loadTuiRevisions() {
   return read((db) => db.select().from(tuiRevisions).all());
+}
+
+export function loadSyncIdentity() {
+  return read((db) => Object.fromEntries(
+    db.select().from(appMeta).all().map((row) => [row.key, row.value]),
+  ));
 }
 
 export function loadChats(): ChatSummary[] | null {

@@ -6,12 +6,16 @@ import input from "input";
 import { ENV } from "./config/env";
 import { onNewMessage } from "./modules/events/onNewMessage";
 import { database } from "./core/db";
+import { startTuiSyncServer, type TuiSyncServer } from "./core/tuiSync/server";
 
 let isShuttingDown = false;
+let tuiSyncServer: TuiSyncServer | null = null;
 
 function shutdown(exitCode = 0) {
   if (isShuttingDown) return;
   isShuttingDown = true;
+  tuiSyncServer?.close();
+  tuiSyncServer = null;
   database.setStatus("disconnected");
   database.close();
   process.exit(exitCode);
@@ -49,6 +53,7 @@ process.on("uncaughtException", (error) => {
 
 async function main() {
   database.start();
+  tuiSyncServer = startTuiSyncServer();
   database.setStatus("connecting");
   database.logEvent({
     eventType: "bot_start",
