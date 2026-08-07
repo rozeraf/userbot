@@ -146,7 +146,9 @@ function TuiApp() {
     return () => { active = false; };
   }, [statusRevision, metricsRevision]);
 
-  const isStale = data.updatedAt == null || now - data.updatedAt > 3000;
+  // A live authenticated UDS is the strongest liveness signal. DB-only mode
+  // falls back to the snapshot heartbeat refreshed by the 15s watchdog.
+  const isStale = syncState !== "live" && (data.updatedAt == null || now - data.updatedAt > 30_000);
   const uptimeMs  = data.connectedSince ? (now - data.connectedSince) : null;
   const uptimeStr = (isStale || data.status === "disconnected" || data.status === "error" || data.status === "loading" || data.status === "waiting")
     ? "N/A"

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { loadSyncIdentity, loadTuiRevisions } from "../data/queries";
 import { startSyncClient, type SyncState } from "./syncClient";
+import { getDataVersion } from "./db";
 
-const REVISION_POLL_MS = 800;
+const WATCHDOG_MS = 15_000;
 type RevisionMap = ReadonlyMap<string, number>;
 const RevisionContext = createContext<RevisionMap>(new Map());
 const SyncStateContext = createContext<SyncState>("offline");
@@ -23,19 +24,46 @@ export function RevisionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const reconcile = () => {
+    let currentRevisions: RevisionMap = new Map();
+    let lastDataVersion = getDataVersion();
+    let wakeGeneration = 0;
+    let checkedWakeGeneration = 0;
+    let socketLive = false;
+
+    const reconcile = (source: "startup" | "wake" | "watchdog") => {
       const rows = loadTuiRevisions();
       if (!active || !rows) return;
       const next = new Map(rows.map((row) => [key(row.resource, row.scope), row.revision]));
+      if (source === "watchdog" && socketLive && wakeGeneration === checkedWakeGeneration) {
+        const meaningfulChange = [...next].some(([revisionKey, revision]) =>
+          !revisionKey.startsWith("runtime_metrics\0") && currentRevisions.get(revisionKey) !== revision,
+        );
+        if (meaningfulChange) console.warn("[tui-sync] missed IPC notification; recovered via data_version watchdog");
+      }
+      currentRevisions = next;
       setRevisions((previous) => equal(previous, next) ? previous : next);
     };
-    reconcile();
-    const timer = setInterval(reconcile, REVISION_POLL_MS);
+    const onWake = () => {
+      wakeGeneration++;
+      reconcile("wake");
+    };
+
+    reconcile("startup");
     const identity = loadSyncIdentity();
     const stopSync = identity?.db_instance_id
-      ? startSyncClient({ dbInstanceId: identity.db_instance_id, onWake: reconcile, onState: setSyncState })
+      ? startSyncClient({
+          dbInstanceId: identity.db_instance_id,
+          onWake,
+          onState: (state) => { socketLive = state === "live"; setSyncState(state); },
+        })
       : () => {};
-    return () => { active = false; clearInterval(timer); stopSync(); };
+    const watchdog = setInterval(() => {
+      const dataVersion = getDataVersion();
+      if (dataVersion != null && lastDataVersion != null && dataVersion !== lastDataVersion) reconcile("watchdog");
+      lastDataVersion = dataVersion;
+      checkedWakeGeneration = wakeGeneration;
+    }, WATCHDOG_MS);
+    return () => { active = false; clearInterval(watchdog); stopSync(); };
   }, []);
 
   return (

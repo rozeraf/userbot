@@ -14,10 +14,10 @@ let tuiSyncServer: TuiSyncServer | null = null;
 function shutdown(exitCode = 0) {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  tuiSyncServer?.close();
-  tuiSyncServer = null;
   database.setStatus("disconnected");
   database.close();
+  tuiSyncServer?.close();
+  tuiSyncServer = null;
   process.exit(exitCode);
 }
 

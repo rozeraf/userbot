@@ -15,6 +15,7 @@ const dbPath = getDbPath();
 // ── Try to open DB, gracefully degrade if not found yet ───────────────────
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sqlite: Database | null = null;
 let _dbReady = false;
 let _dbError: string | null = null;
 
@@ -31,6 +32,7 @@ function tryOpenDb() {
     // a lock.
     sqlite.run("PRAGMA busy_timeout = 50;");
     _db = drizzle(sqlite, { schema });
+    _sqlite = sqlite;
     _dbReady = true;
     console.error("[tui/db] Connected (read-only):", dbPath);
   } catch (err: unknown) {
@@ -61,4 +63,15 @@ export function dbError(): string | null {
  */
 export function getDb() {
   return _db;
+}
+
+/** Connection-local commit counter used only by the rare reconciliation watchdog. */
+export function getDataVersion(): number | null {
+  if (!_sqlite) return null;
+  try {
+    const row = _sqlite.query("PRAGMA data_version").get() as { data_version?: number } | null;
+    return row?.data_version ?? null;
+  } catch {
+    return null;
+  }
 }
