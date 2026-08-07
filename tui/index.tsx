@@ -213,7 +213,7 @@ function TuiApp() {
       <Box justifyContent="space-between" paddingX={1}
            borderStyle="single" borderColor="cyan"
            borderTop={false} borderLeft={false} borderRight={false}>
-        <Text bold color="cyan">⚡ TG-GEMINI-USERBOT</Text>
+        <Text bold color="cyan">⚡ TG-USERBOT</Text>
         <Text color="gray">
           <Text bold color={headerStatusColor}>{data.isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
           {" · "}

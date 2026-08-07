@@ -28,7 +28,7 @@ export function WaitingScreen({ width, height }: Props) {
     <Box width={width} height={height} flexDirection="column"
          alignItems="center" justifyContent="center">
       <Box flexDirection="column" alignItems="center">
-        <Text bold color="cyan">⚡ TG-GEMINI-USERBOT TUI</Text>
+        <Text bold color="cyan">⚡ TG-USERBOT TUI</Text>
         <Box marginTop={1}>
           <Text color="yellow">{spinner} </Text>
           <Text color="gray">Waiting for bot database…</Text>

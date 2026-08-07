@@ -1,5 +1,5 @@
 {
-  "name": "tg-gemini-userbot",
+  "name": "tg-userbot",
   "version": "1.0.0",
   "description": "Юзербот для Telegram: команда !answer генерирует ответ через Gemini API",
   "type": "module",

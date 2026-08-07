@@ -54,7 +54,7 @@ async function main() {
     eventType: "bot_start",
     level: "info",
     category: "system",
-    message: "Starting tg-gemini-userbot",
+    message: "Starting tg-userbot",
     metadata: { hasSession: Boolean(ENV.TG_SESSION) },
   });
   const session = new StringSession(ENV.TG_SESSION);
