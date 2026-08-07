@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+*.db binary
+*.db-shm binary
+*.db-wal binary
+*.sqlite binary
+*.sqlite-shm binary
+*.sqlite-wal binary

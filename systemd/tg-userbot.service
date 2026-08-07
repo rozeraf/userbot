@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/raf/projects/userbot
-EnvironmentFile=/home/raf/projects/userbot/.env
+WorkingDirectory=%h/projects/userbot
+EnvironmentFile=%h/projects/userbot/.env
 Environment=NODE_ENV=production
-ExecStart=/home/raf/.bun/bin/bun run index.ts
+ExecStart=%h/.bun/bin/bun run index.ts
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s

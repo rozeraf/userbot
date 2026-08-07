@@ -1,7 +1,7 @@
 {
   "name": "tg-userbot",
   "version": "1.0.0",
-  "description": "Юзербот для Telegram: команда !answer генерирует ответ через Gemini API",
+  "description": "Telegram userbot with LLM commands, SQLite logging, and a read-only TUI",
   "type": "module",
   "engines": {
     "bun": ">=1.0.0"
@@ -9,7 +9,11 @@
   "scripts": {
     "start": "bun run index.ts",
     "dev": "bun run --watch index.ts",
-    "tui": "bun run tui/index.tsx"
+    "tui": "bun run tui/index.tsx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run test",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
@@ -22,6 +26,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^7.0.2"
   }
 }

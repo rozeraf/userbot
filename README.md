@@ -4,7 +4,22 @@ Telegram userbot, работающий под твоим личным аккау
 
 Поддерживает **Gemini** (Google) и **Cerebras** как провайдеры; переключаются на лету командой прямо в Telegram. Весь трафик (сообщения, вызовы LLM, события) логируется в локальную SQLite-базу через [Drizzle ORM](https://orm.drizzle.team/).
 
----
+Документы проекта: [правила разработки](CONTRIBUTING.md), [roadmap](todo.md), [синхронизация TUI](docs/tui-sync.md).
+
+## Быстрый старт
+
+```bash
+bun install
+cp .env.example .env
+# заполнить TG_API_ID, TG_API_HASH и ключ активного LLM-провайдера
+bun start
+```
+
+В другом терминале можно открыть read-only мониторинг:
+
+```bash
+bun run tui
+```
 
 ## Команды
 
@@ -76,6 +91,10 @@ CEREBRAS_MODEL=gpt-oss-120b     # опционально
 
 # Необязательно: число дней хранения приватных журналов. 0 = бессрочно.
 DB_RETENTION_DAYS=0
+DB_PATH=./userbot.db
+
+# Имя экземпляра разделяет TUI sockets при запуске нескольких ботов.
+USERBOT_INSTANCE=default
 
 # Системный промпт (общий стиль ответов):
 SYSTEM_PROMPT="Отвечай кратко и по существу."
@@ -102,10 +121,18 @@ bun run index.ts
 bun start
 ```
 
+Перед коммитом или обновлением сервиса:
+
+```bash
+bun run check
+git diff --check
+```
+
 ### Запуск через systemd (user service)
 
-Unit рассчитан на пользователя `raf` и текущий путь репозитория. Убедись, что
-`.env` заполнен и имеет права доступа только для владельца, затем установи unit:
+Unit предполагает clone в `~/projects/userbot`. Для другого расположения измени
+`WorkingDirectory`, `EnvironmentFile` и `ExecStart`. Убедись, что `.env` заполнен
+и доступен только владельцу:
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -122,7 +149,7 @@ journalctl --user -u tg-userbot -f
 ```
 
 Чтобы сервис продолжал работать после logout, один раз выполни
-`loginctl enable-linger raf`.
+`loginctl enable-linger "$USER"`.
 
 ---
 
@@ -137,13 +164,15 @@ src/
 │   ├── db/
 │   │   ├── schema.ts           # Схема таблиц (Drizzle) — единственное место правды
 │   │   ├── client.ts           # SQLite + WAL + drizzle() + migrate()
-│   │   ├── index.ts            # Буферизованный logging API (logMessage / logLLMCall / logEvent)
+│   │   ├── writer.ts           # Единая transaction boundary + TUI revisions
+│   │   ├── index.ts            # Буферизованный logging API
 │   │   └── migrations/         # SQL-миграции, генерируются drizzle-kit
 │   ├── llm/
 │   │   ├── index.ts            # askCurrent() / askByProvider() + автологирование вызовов
 │   │   ├── gemini.ts           # Gemini REST API (fetch + AbortController, 45s timeout)
 │   │   ├── cerebras.ts         # Cerebras OpenAI-compatible API
 │   │   └── prompt.ts           # buildPrompt(), normalizeText(), preview()
+│   ├── tuiSync/                # Coalesced UDS wake protocol для read-only TUI
 │   └── state.ts                # Активный провайдер — in-memory + сохранение на диск
 └── modules/
     ├── events/
@@ -160,6 +189,9 @@ src/
         └── translate/          # !translate
 
 drizzle.config.ts               # Конфиг drizzle-kit
+tui/                            # Ink TUI: projections, revisions, panels
+docs/                           # Архитектурные документы
+systemd/                        # Шаблон user service
 ```
 
 Каждый модуль команды — изолированная папка с `init.ts` (экспортирует `CommandModule`) и файлом логики. Новую команду нужно явно добавить в `src/modules/commands/index.ts`: это фиксирует порядок сопоставления и не позволяет незаметно пропустить ошибку загрузки.
@@ -222,11 +254,14 @@ drizzle.config.ts               # Конфиг drizzle-kit
 
 ```bash
 # Сгенерировать миграцию из изменений в schema.ts
-bunx drizzle-kit generate
+bun run db:generate
 
 # Коммитим SQL-файл; при следующем bun start он применится автоматически
 git add src/core/db/migrations/
 ```
+
+Уже применённые миграции не редактируются — любое исправление оформляется новой
+миграцией.
 
 Миграции применяются автоматически при старте бота через `migrate()`.
 
@@ -255,6 +290,8 @@ db.select()
 ---
 
 ## Технические детали
+
+Подробный протокол актуализации панелей описан в [docs/tui-sync.md](docs/tui-sync.md).
 
 ### Производительность записи
 
