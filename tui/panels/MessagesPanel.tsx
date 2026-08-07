@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadChats, loadMessages } from "../data/queries";
-import { POLL_CHATLIST_MS, POLL_MSGFEED_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
+import { useRevision } from "../core/revisions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,7 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
   const [chats, setChats]         = useState<ChatSummary[]>([]);
   const [chatCursor, setChatCursor] = useState(0);
   const [side, setSide]           = useState<PanelSide>("chats");
+  const chatsRevision             = useRevision("chats");
 
   // ── Message list state ─────────────────────────────────────────────────────
   const [msgBuffer,  setMsgBuffer] = useState<MessageRow[]>([]);
@@ -62,12 +63,12 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     };
 
     fetchChats();
-    const id = setInterval(fetchChats, isFocused ? POLL_CHATLIST_MS : POLL_CHATLIST_MS * POLL_UNFOCUSED_MULTIPLIER);
-    return () => { active = false; clearInterval(id); };
-  }, [isFocused]);
+    return () => { active = false; };
+  }, [chatsRevision]);
 
   // ── Poll messages for selected chat ───────────────────────────────────────
   const selectedChat = chats[chatCursor] ?? null;
+  const messagesRevision = useRevision("messages", selectedChat?.chatId ?? "");
 
   useEffect(() => {
     if (!selectedChat) return;
@@ -89,9 +90,8 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
     };
 
     fetchMsgs();
-    const id = setInterval(fetchMsgs, isFocused ? POLL_MSGFEED_MS : POLL_MSGFEED_MS * POLL_UNFOCUSED_MULTIPLIER);
-    return () => { active = false; clearInterval(id); };
-  }, [selectedChat?.chatId, isFocused]);
+    return () => { active = false; };
+  }, [selectedChat?.chatId, messagesRevision]);
 
   // ── Derived viewport ───────────────────────────────────────────────────────
   // Layout: left chat list 26 cols, right message area fills rest

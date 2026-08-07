@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import { loadErrorEvents, loadEventsAfter } from "../data/queries";
+import { loadErrorEvents, loadEventsAfter, loadRecentEvents } from "../data/queries";
 import { writeFileSync } from "fs";
-import { POLL_EVENTLOG_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
+import { useRevision } from "../core/revisions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -117,6 +117,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
   // ── Live buffer (incremental polling) ───────────────────────────────────────
   const [buffer,  setBuffer]  = useState<LogEntry[]>([]);
   const lastIdRef             = useRef(0);
+  const revision              = useRevision("events");
 
   // ── Filters ─────────────────────────────────────────────────────────────────
   type CategoryFilter = Set<EventCategory>;
@@ -155,14 +156,23 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetchLive = () => {
-      const rows = loadEventsAfter(lastIdRef.current);
+      let rows = lastIdRef.current === 0 ? loadRecentEvents(500) : loadEventsAfter(lastIdRef.current);
+      let replaceBuffer = lastIdRef.current === 0;
       if (!active || !rows || rows.length === 0) return;
-        lastIdRef.current = rows[rows.length - 1]!.id;
+      if (lastIdRef.current !== 0) {
+        const accumulated = [...rows];
+        while (rows.length === 200 && accumulated.length < MAX_BUFFER) {
+          rows = loadEventsAfter(accumulated[accumulated.length - 1]!.id) ?? [];
+          accumulated.push(...rows);
+        }
+        // A viewer needs a useful current window, not an unbounded replay.
+        replaceBuffer = accumulated.length >= MAX_BUFFER;
+        rows = replaceBuffer ? (loadRecentEvents(500) ?? accumulated.slice(-500)) : accumulated;
+      }
+      lastIdRef.current = rows[rows.length - 1]!.id;
 
-        setBuffer((prev) => {
-          const next = [
-            ...prev,
-            ...rows.map((r) => ({
+      setBuffer((prev) => {
+        const mapped = rows.map((r) => ({
               id:        r.id,
               eventType: r.eventType,
               level:     (r.level ?? "info") as EventLevel,
@@ -170,16 +180,15 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
               message:   r.message,
               metadata:  r.metadata ?? null,
               timestamp: r.timestamp,
-            })),
-          ];
-          return next.length > MAX_BUFFER ? next.slice(next.length - MAX_BUFFER) : next;
-        });
+        }));
+        const next = replaceBuffer ? mapped : [...prev, ...mapped];
+        return next.length > MAX_BUFFER ? next.slice(next.length - MAX_BUFFER) : next;
+      });
     };
 
     fetchLive();
-    const id = setInterval(fetchLive, isFocused ? POLL_EVENTLOG_MS : POLL_EVENTLOG_MS * POLL_UNFOCUSED_MULTIPLIER);
-    return () => { active = false; clearInterval(id); };
-  }, [isFocused]);
+    return () => { active = false; };
+  }, [revision]);
 
   // ── Error-mode fetch (separate query, DESC, limit N) ────────────────────────
   useEffect(() => {
@@ -205,9 +214,8 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
     };
 
     fetchErrors();
-    const id = setInterval(fetchErrors, isFocused ? POLL_EVENTLOG_MS : POLL_EVENTLOG_MS * POLL_UNFOCUSED_MULTIPLIER);
-    return () => { active = false; clearInterval(id); };
-  }, [viewMode, errorLimit, isFocused]);
+    return () => { active = false; };
+  }, [viewMode, errorLimit, revision]);
 
   // ── Derived view ─────────────────────────────────────────────────────────────
 

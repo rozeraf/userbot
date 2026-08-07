@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadRecentLlmCalls } from "../data/queries";
 import { writeFileSync } from "fs";
-import { POLL_LLMCALLS_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
+import { useRevision } from "../core/revisions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -113,6 +113,7 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
   const [showDetail,  setShowDetail]  = useState(false);
   const [flash,       setFlash]       = useState<string | null>(null);
   const flashTimerRef                  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revision                       = useRevision("llm_calls");
 
   function showFlash(msg: string) {
     setFlash(msg);
@@ -144,9 +145,8 @@ export function LlmCallsPanel({ height = 24, isFocused }: Props) {
     };
 
     fetch();
-    const id = setInterval(fetch, isFocused ? POLL_LLMCALLS_MS : POLL_LLMCALLS_MS * POLL_UNFOCUSED_MULTIPLIER);
-    return () => { active = false; clearInterval(id); };
-  }, [isFocused]);
+    return () => { active = false; };
+  }, [revision]);
 
   // ── Known providers (for filter cycling) ──────────────────────────────────
   const providers = ["all", ...Array.from(new Set(buffer.map((r) => r.provider))).sort()];

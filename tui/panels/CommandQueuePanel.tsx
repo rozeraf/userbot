@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadCommandExecutions } from "../data/queries";
-import { POLL_CMDQUEUE_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
+import { useRevision } from "../core/revisions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -160,6 +160,7 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
   const [entries, setEntries] = useState<CommandEntry[]>([]);
   const [now, setNow]         = useState(Date.now());
   const [cursor, setCursor]   = useState(0);
+  const revision              = useRevision("commands");
 
   // Refresh clock every second (for live duration of running cmds)
   useEffect(() => {
@@ -188,9 +189,8 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
     };
 
     fetch();
-    const id = setInterval(fetch, isFocused ? POLL_CMDQUEUE_MS : POLL_CMDQUEUE_MS * POLL_UNFOCUSED_MULTIPLIER);
-    return () => { active = false; clearInterval(id); };
-  }, [isFocused]);
+    return () => { active = false; };
+  }, [revision]);
 
   // Viewport
   const innerH    = Math.max(2, height - 4);

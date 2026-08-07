@@ -2,9 +2,8 @@ import React, { useState, useEffect } from "react";
 import { render, Box, Text, useInput, useApp, useStdout } from "ink";
 import { loadTuiConfig, saveTuiConfig } from "./core/config";
 import type { PanelName } from "./core/config";
-import { usePoll } from "./core/usePoll";
 import { isDbReady } from "./core/db";
-import { POLL_SNAPSHOT_MS, POLL_UNFOCUSED_MULTIPLIER } from "./core/constants";
+import { RevisionProvider, useRevision } from "./core/revisions";
 import { loadStatusSnapshot } from "./data/queries";
 import { EventLogPanel }     from "./panels/EventLogPanel";
 import { CommandQueuePanel } from "./panels/CommandQueuePanel";
@@ -102,18 +101,31 @@ function TuiApp() {
 
   // ── Snapshot polling ─────────────────────────────────────────────────────────
 
-  const data = usePoll<StatusData>(
-    async () => {
+  const statusRevision = useRevision("status");
+  const metricsRevision = useRevision("runtime_metrics");
+  const [data, setData] = useState<StatusData>({
+    messages: 0, llmCalls: 0, events: 0,
+    status: "loading", provider: "N/A", connectedSince: null,
+    pingMs: null, incomingCount: 0, outgoingCount: 0, aiRequestCount: 0,
+    errorCount: 0, queueState: "loading", memoryMb: 0, updatedAt: null, isStale: true,
+  });
+  useEffect(() => {
+    let active = true;
+    const load = () => {
       const result = loadStatusSnapshot();
-      if (!result) return {
+      if (!result) return;
+      if (!result.snapshot) {
+        if (active) setData({
         messages: 0, llmCalls: 0, events: 0,
         status: "waiting", provider: "N/A", connectedSince: null,
         pingMs: null, incomingCount: 0, outgoingCount: 0, aiRequestCount: 0,
         errorCount: 0, queueState: "waiting", memoryMb: 0, updatedAt: null, isStale: true,
-      };
+        });
+        return;
+      }
       const { messagesCount, llmCallsCount, eventsCount, snapshot } = result;
       const isStale = snapshot ? (Date.now() - snapshot.updatedAt > 3000) : true;
-      return {
+      if (active) setData({
         messages: messagesCount, llmCalls: llmCallsCount, events: eventsCount,
         status: isStale ? "disconnected" : (snapshot?.status ?? "unknown"),
         provider: snapshot?.provider ?? "N/A",
@@ -127,19 +139,15 @@ function TuiApp() {
         memoryMb: snapshot?.memoryMb ?? 0,
         updatedAt: snapshot?.updatedAt ?? null,
         isStale,
-      };
-    },
-    visiblePanels.has("status") ? POLL_SNAPSHOT_MS : POLL_SNAPSHOT_MS * POLL_UNFOCUSED_MULTIPLIER,
-    {
-      messages: 0, llmCalls: 0, events: 0,
-      status: "loading", provider: "N/A", connectedSince: null,
-      pingMs: null, incomingCount: 0, outgoingCount: 0, aiRequestCount: 0,
-      errorCount: 0, queueState: "loading", memoryMb: 0, updatedAt: null, isStale: true,
-    }
-  );
+      });
+    };
+    load();
+    return () => { active = false; };
+  }, [statusRevision, metricsRevision]);
 
+  const isStale = data.updatedAt == null || now - data.updatedAt > 3000;
   const uptimeMs  = data.connectedSince ? (now - data.connectedSince) : null;
-  const uptimeStr = (data.status === "disconnected" || data.status === "error" || data.status === "loading" || data.status === "waiting")
+  const uptimeStr = (isStale || data.status === "disconnected" || data.status === "error" || data.status === "loading" || data.status === "waiting")
     ? "N/A"
     : formatUptime(uptimeMs);
 
@@ -176,8 +184,8 @@ function TuiApp() {
     }
   });
 
-  const headerStatusColor = data.isStale ? "red" : data.status === "active" ? "green" : "yellow";
-  const statusPanelColor  = data.isStale ? "red" : "green";
+  const headerStatusColor = isStale ? "red" : data.status === "active" ? "green" : "yellow";
+  const statusPanelColor  = isStale ? "red" : "green";
 
   const msgFocused   = focus === "messages" && visiblePanels.has("messages");
   const llmFocused   = focus === "llm"      && visiblePanels.has("llmCalls");
@@ -215,7 +223,7 @@ function TuiApp() {
            borderTop={false} borderLeft={false} borderRight={false}>
         <Text bold color="cyan">⚡ TG-USERBOT</Text>
         <Text color="gray">
-          <Text bold color={headerStatusColor}>{data.isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
+          <Text bold color={headerStatusColor}>{isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
           {" · "}
           Ping: <Text color={data.pingMs ? "green" : "gray"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text>
           {" · "}
@@ -232,20 +240,20 @@ function TuiApp() {
                width={26} height={availH} flexShrink={0} paddingX={1} marginRight={1} overflow="hidden">
             <Text bold color={statusPanelColor}>📊 [1] Status</Text>
             <Box flexDirection="column" marginTop={1}>
-              <Text>Status:{" "}<Text bold color={headerStatusColor}>{data.isStale ? "DISCO" : data.status.toUpperCase()}</Text></Text>
+              <Text>Status:{" "}<Text bold color={headerStatusColor}>{isStale ? "DISCO" : data.status.toUpperCase()}</Text></Text>
               <Text>Prov: <Text bold color="cyan">{data.provider}</Text></Text>
               <Text>Up:   <Text color="yellow">{uptimeStr}</Text></Text>
               <Text>Ping: <Text color={data.pingMs && data.pingMs < 200 ? "green" : "yellow"}>{data.pingMs != null ? `${data.pingMs}ms` : "N/A"}</Text></Text>
 
               <Box marginTop={1}><Text color="gray">─ Counters ─</Text></Box>
-              <Text>In:  <Text color={data.isStale ? "gray" : "white"}>{data.incomingCount}</Text></Text>
-              <Text>Out: <Text color={data.isStale ? "gray" : "white"}>{data.outgoingCount}</Text></Text>
-              <Text>AI:  <Text color={data.isStale ? "gray" : "white"}>{data.aiRequestCount}</Text></Text>
+              <Text>In:  <Text color={isStale ? "gray" : "white"}>{data.incomingCount}</Text></Text>
+              <Text>Out: <Text color={isStale ? "gray" : "white"}>{data.outgoingCount}</Text></Text>
+              <Text>AI:  <Text color={isStale ? "gray" : "white"}>{data.aiRequestCount}</Text></Text>
               <Text>Err: <Text color={data.errorCount > 0 ? "red" : "gray"}>{data.errorCount}</Text></Text>
 
               <Box marginTop={1}><Text color="gray">─ System ─</Text></Box>
-              <Text>Q: <Text color={data.isStale ? "gray" : data.queueState === "idle" ? "green" : "yellow"}>{data.queueState}</Text></Text>
-              <Text>Mem: <Text color={data.isStale ? "gray" : "white"}>{data.memoryMb}MB</Text></Text>
+              <Text>Q: <Text color={isStale ? "gray" : data.queueState === "idle" ? "green" : "yellow"}>{data.queueState}</Text></Text>
+              <Text>Mem: <Text color={isStale ? "gray" : "white"}>{data.memoryMb}MB</Text></Text>
 
               <Box marginTop={1}><Text color="gray">─ Panels ─</Text></Box>
               <Text color="gray">[1]St [2]Msg [3]LLM</Text>
@@ -291,7 +299,7 @@ function TuiApp() {
   );
 }
 
-const tui = render(<TuiApp />);
+const tui = render(<RevisionProvider><TuiApp /></RevisionProvider>);
 
 // Let Ink restore raw mode and the cursor before the process terminates.
 const shutdown = (exitCode: number) => {
