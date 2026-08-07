@@ -26,11 +26,6 @@ function nonNegativeInteger(name: string, fallback: number): number {
   return value;
 }
 
-export function pickRandomApiKey(keys: readonly string[]): string {
-  if (keys.length === 0) throw new Error("No API keys configured");
-  return keys[Math.floor(Math.random() * keys.length)]!;
-}
-
 const rawProvider = (process.env.LLM_PROVIDER ?? "gemini").trim().toLowerCase();
 if (rawProvider !== "gemini" && rawProvider !== "cerebras") {
   throw new Error(`Invalid LLM_PROVIDER: "${rawProvider}" must be gemini or cerebras`);
@@ -65,6 +60,7 @@ export const ENV = {
   CEREBRAS_MODEL: process.env.CEREBRAS_MODEL?.trim() || "gpt-oss-120b",
 
   SYSTEM_PROMPT: process.env.SYSTEM_PROMPT?.trim() || "",
+  MAX_LLM_PROMPT_GRAPHEMES: nonNegativeInteger("MAX_LLM_PROMPT_GRAPHEMES", 30_000),
   /** 0 keeps history forever; a positive value deletes older private logs. */
   DB_RETENTION_DAYS: nonNegativeInteger("DB_RETENTION_DAYS", 0),
 
@@ -78,6 +74,11 @@ export const ENV = {
   CEREBRAS_API_KEYS: string[];
   CEREBRAS_MODEL: string;
   SYSTEM_PROMPT: string;
+  MAX_LLM_PROMPT_GRAPHEMES: number;
   DB_RETENTION_DAYS: number;
   LLM_PROVIDER: Provider;
 };
+
+export function hasKeysFor(provider: Provider): boolean {
+  return provider === "gemini" ? ENV.GEMINI_API_KEYS.length > 0 : ENV.CEREBRAS_API_KEYS.length > 0;
+}

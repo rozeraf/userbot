@@ -29,7 +29,8 @@ export function consumeServiceMessage(chatId: unknown, messageId: unknown): bool
 }
 
 function splitForTelegram(text: string): string[] {
-  const chars = Array.from(text);
+  const chars = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)]
+    .map(({ segment }) => segment);
   if (chars.length <= MAX_TELEGRAM_MESSAGE_LENGTH) return [text];
 
   const chunks: string[] = [];

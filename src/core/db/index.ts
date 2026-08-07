@@ -100,6 +100,7 @@ export const database = {
       database.rebuildChatSummary();
     }
 
+    database.recoverInterruptedCommands();
     database.pruneOldRecords();
     nextRetentionPruneAt = Date.now() + RETENTION_PRUNE_INTERVAL_MS;
     tickInterval = setInterval(() => {
@@ -173,6 +174,24 @@ export const database = {
       .set({ status, error: error ?? null, finishedAt: Date.now() })
       .where(and(eq(commandExecutions.chatId, chatId), eq(commandExecutions.messageId, messageId)))
       .run();
+  },
+
+  recoverInterruptedCommands() {
+    const now = Date.now();
+    const result = sqlite.run(
+      `UPDATE command_executions
+       SET status = 'failed', error = ?, finished_at = ?
+       WHERE status = 'running'`,
+      ["Process interrupted before command completion", now],
+    );
+    if (result.changes > 0) {
+      database.logEvent({
+        eventType: "commands_recovered",
+        level: "warn",
+        category: "system",
+        message: `Marked ${result.changes} interrupted command(s) as failed`,
+      });
+    }
   },
 
   logMessage(msg: PendingMessage) {

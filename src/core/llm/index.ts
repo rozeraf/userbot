@@ -4,6 +4,7 @@ import { askCerebras } from "./cerebras";
 import { askGemini } from "./gemini";
 import { database } from "../db";
 import { errorMessage } from "../errors";
+import { limitGraphemes } from "./prompt";
 
 export type LlmRequestContext = {
   correlationId?: string;
@@ -23,6 +24,7 @@ export async function askByProvider(
   context: LlmRequestContext = {},
 ): Promise<string> {
   console.log("[llm] activeProvider:", provider);
+  prompt = limitGraphemes(prompt, ENV.MAX_LLM_PROMPT_GRAPHEMES);
   const t0 = Date.now();
   try {
     const response = provider === "cerebras"

@@ -1,4 +1,4 @@
-import { ENV } from "../../../config/env";
+import { ENV, hasKeysFor } from "../../../config/env";
 import type { Provider } from "../../../config/env";
 import { state } from "../../../core/state";
 import type { CommandModule } from "../types";
@@ -10,10 +10,10 @@ export const providerCommand: CommandModule = {
   async run({ message, text }) {
     const provider: Provider = text === "!gemini" ? "gemini" : "cerebras";
     const config = provider === "gemini"
-      ? { apiKeys: ENV.GEMINI_API_KEYS, envName: "GEMINI_API_KEYS", label: "Gemini" }
-      : { apiKeys: ENV.CEREBRAS_API_KEYS, envName: "CEREBRAS_API_KEYS", label: "Cerebras" };
+      ? { envName: "GEMINI_API_KEYS", label: "Gemini" }
+      : { envName: "CEREBRAS_API_KEYS", label: "Cerebras" };
 
-    if (config.apiKeys.length === 0) {
+    if (!hasKeysFor(provider)) {
       try {
         await message.reply({ message: `Ошибка: В .env не задан ${config.envName}.` });
       } catch (replyErr) {

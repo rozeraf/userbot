@@ -11,6 +11,13 @@ export function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
 }
 
+export function limitGraphemes(text: string, limit: number): string {
+  if (limit === 0) return text;
+  const segments = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)];
+  if (segments.length <= limit) return text;
+  return `${segments.slice(0, limit).map(({ segment }) => segment).join("")}\n\n[truncated]`;
+}
+
 /** Command-specific rules supplement, rather than silently replace, the user configuration. */
 export function combineSystemPrompts(base: string, commandRules?: string): string | undefined {
   return [base.trim(), commandRules?.trim()]

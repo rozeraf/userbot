@@ -4,7 +4,7 @@ export const remindCommand: CommandModule = {
   name: "remind",
   match: (text) => text === "!remind" || text.startsWith("!remind "),
   async run({ client, message, text }) {
-    const userInput = text.slice("!remind".length).trim();
+    const userInput = text.slice("!remind".length).replace(/[\r\n]+/g, " ").trim();
 
     console.log("[remind] trigger detected", {
       userInputPresent: Boolean(userInput),
