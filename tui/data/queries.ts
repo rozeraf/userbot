@@ -1,4 +1,4 @@
-import { asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, or } from "drizzle-orm";
 import { getDb } from "../core/db";
 import { appMeta, chatSummary, commandExecutions, eventLog, llmCalls, messages, statusSnapshot, tuiRevisions } from "../../src/core/db/schema";
 
@@ -51,8 +51,21 @@ export interface EventRow {
   timestamp: number;
 }
 
-export function loadTuiRevisions() {
-  return read((db) => db.select().from(tuiRevisions).all());
+export function loadRelevantRevisions(selectedChatId: string | null) {
+  return read((db) => db.select().from(tuiRevisions).where(or(
+    and(eq(tuiRevisions.scope, ""), or(
+      eq(tuiRevisions.resource, "status"),
+      eq(tuiRevisions.resource, "runtime_metrics"),
+      eq(tuiRevisions.resource, "chats"),
+      eq(tuiRevisions.resource, "messages"),
+      eq(tuiRevisions.resource, "llm_calls"),
+      eq(tuiRevisions.resource, "events"),
+      eq(tuiRevisions.resource, "commands"),
+    )),
+    selectedChatId
+      ? and(eq(tuiRevisions.resource, "messages"), eq(tuiRevisions.scope, selectedChatId))
+      : undefined,
+  )).all());
 }
 
 export function loadSyncIdentity() {

@@ -43,10 +43,22 @@ describe("DB writer revisions", () => {
   test("duplicate insert does not bump projections", () => {
     const beforeMessages = revision("messages", "A");
     const beforeChats = revision("chats");
+    database.updateSnapshot();
+    const beforeIncoming = db.select().from(schema.statusSnapshot).all()[0]?.incomingCount;
     database.logMessage({ messageId: 1, chatId: "A", text: "duplicate", isOutgoing: false });
     database.flush(true);
+    database.updateSnapshot();
     expect(revision("messages", "A")).toBe(beforeMessages);
     expect(revision("chats")).toBe(beforeChats);
+    expect(db.select().from(schema.statusSnapshot).all()[0]?.incomingCount).toBe(beforeIncoming);
+  });
+
+  test("bulk message epoch is independent from chat scopes", () => {
+    const beforeGlobal = revision("messages");
+    const beforeScoped = revision("messages", "A");
+    writeTransaction((_tx, changed) => changed.mark("messages"));
+    expect(revision("messages")).toBe(beforeGlobal + 1);
+    expect(revision("messages", "A")).toBe(beforeScoped);
   });
 
   test("rollback also rolls back revisions", () => {

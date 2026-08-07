@@ -27,6 +27,7 @@ let llmCallBuffer: NewLLMCall[]  = [];
 let eventLogBuffer: NewEvent[]   = [];
 
 const FLUSH_INTERVAL_MS = 1000; // periodic flush and status snapshot tick every 1 s
+const METRICS_SNAPSHOT_INTERVAL_MS = 10_000;
 const MAX_BUFFER_SIZE  = 50;
 const MAX_BUFFERED_RECORDS = 10_000;
 const MAX_FLUSH_BACKOFF_MS = 30_000;
@@ -203,12 +204,6 @@ export const database = {
 
   logMessage(msg: PendingMessage) {
     if (!canBuffer()) return;
-    if (msg.isOutgoing) {
-      outgoingCount++;
-    } else {
-      incomingCount++;
-    }
-
     messageBuffer.push({ ...msg, timestamp: Date.now() });
     checkFlush();
   },
@@ -244,7 +239,7 @@ export const database = {
     const provider = state.getProvider();
     const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
 
-    const updatedAt = Date.now();
+    const now = Date.now();
     const next = {
       id: 1,
       status: botStatus,
@@ -258,7 +253,7 @@ export const database = {
       eventCount,
       queueState,
       memoryMb,
-      updatedAt,
+      updatedAt: now,
     };
 
     try {
@@ -270,9 +265,10 @@ export const database = {
           || current.errorCount !== next.errorCount || current.eventCount !== next.eventCount
           || current.queueState !== next.queueState;
         const metricsChanged = !current || current.pingMs !== next.pingMs || current.memoryMb !== next.memoryMb
-          || current.updatedAt !== next.updatedAt;
+          || now - current.updatedAt >= METRICS_SNAPSHOT_INTERVAL_MS;
         if (!statusChanged && !metricsChanged) return;
-        tx.insert(statusSnapshot).values(next).onConflictDoUpdate({ target: statusSnapshot.id, set: next }).run();
+        const persisted = metricsChanged || !current ? next : { ...next, updatedAt: current.updatedAt };
+        tx.insert(statusSnapshot).values(persisted).onConflictDoUpdate({ target: statusSnapshot.id, set: persisted }).run();
         if (statusChanged) changed.mark("status");
         if (metricsChanged) changed.mark("runtime_metrics");
       });
@@ -290,7 +286,9 @@ export const database = {
     const events = eventLogBuffer.splice(0);
 
     try {
-      writeTransaction((tx, changed) => {
+      const insertedCounts = writeTransaction((tx, changed) => {
+        let incoming = 0;
+        let outgoing = 0;
         if (msgs.length) {
           // Only update summaries for rows SQLite actually inserted.  Telegram
           // can redeliver updates, and counting the input buffer here would
@@ -302,11 +300,14 @@ export const database = {
               chatTitle: messages.chatTitle,
               telegramTimestamp: messages.telegramTimestamp,
               timestamp: messages.timestamp,
+              isOutgoing: messages.isOutgoing,
             })
             .all();
 
           const summaries = new Map<string, { lastTimestamp: number; chatTitle: string | null; messageCount: number }>();
           for (const message of insertedMessages) {
+            if (message.isOutgoing) outgoing++;
+            else incoming++;
             changed.mark("messages", message.chatId);
             const previous = summaries.get(message.chatId);
             const timestamp = message.telegramTimestamp ?? message.timestamp;
@@ -340,7 +341,10 @@ export const database = {
           tx.insert(eventLog).values(events).run();
           changed.mark("events");
         }
+        return { incoming, outgoing };
       });
+      incomingCount += insertedCounts.incoming;
+      outgoingCount += insertedCounts.outgoing;
       secureDbFiles();
       consecutiveFlushFailures = 0;
       nextFlushAt = 0;
@@ -363,10 +367,6 @@ export const database = {
     const cutoff = Date.now() - ENV.DB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     try {
       writeTransaction((tx, changed) => {
-        const affectedChats = tx.selectDistinct({ chatId: messages.chatId })
-          .from(messages)
-          .where(sql`${messages.timestamp} < ${cutoff}`)
-          .all();
         tx.delete(messages).where(sql`${messages.timestamp} < ${cutoff}`).run();
         // Retention is infrequent, so rebuilding once is simpler and keeps the
         // denormalized TUI summary exact even when a chat is fully removed.
@@ -383,7 +383,7 @@ export const database = {
         tx.delete(llmCalls).where(sql`${llmCalls.timestamp} < ${cutoff}`).run();
         tx.delete(eventLog).where(sql`${eventLog.timestamp} < ${cutoff}`).run();
         tx.delete(commandExecutions).where(sql`${commandExecutions.startedAt} < ${cutoff}`).run();
-        for (const { chatId } of affectedChats) changed.mark("messages", chatId);
+        changed.mark("messages");
         changed.mark("chats");
         changed.mark("llm_calls");
         changed.mark("events");

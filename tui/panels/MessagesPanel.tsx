@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadChats, loadMessages } from "../data/queries";
-import { useRevision } from "../core/revisions";
+import { useRevision, useSelectedMessagesRevision } from "../core/revisions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
 
   // ── Poll messages for selected chat ───────────────────────────────────────
   const selectedChat = chats[chatCursor] ?? null;
-  const messagesRevision = useRevision("messages", selectedChat?.chatId ?? "");
+  const messagesRevision = useSelectedMessagesRevision(selectedChat?.chatId ?? null);
 
   useEffect(() => {
     if (!selectedChat) return;
