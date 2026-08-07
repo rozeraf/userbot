@@ -298,7 +298,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
         const base = c !== null ? c : activeList.length - 1;
         return Math.max(0, base - 1);
       });
-      setScrollTop((t) => Math.max(0, t - 1));
+      setScrollTop(Math.max(0, effectiveScroll - 1));
       return;
     }
     if (isDown) {
@@ -308,11 +308,9 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
         if (next >= activeList.length - 1) { setFrozen(false); }
         return next;
       });
-      setScrollTop((t) => {
-        const next = t + 1;
-        if (next >= maxScroll) { setFrozen(false); return maxScroll; }
-        return next;
-      });
+      const nextScroll = Math.min(maxScroll, effectiveScroll + 1);
+      if (nextScroll >= maxScroll) setFrozen(false);
+      setScrollTop(nextScroll);
       return;
     }
     if (isPageUp) {
@@ -352,7 +350,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
-         height={height} overflow="hidden">
+         height={height} flexShrink={0} overflow="hidden">
       {/* ── Title row ── */}
       <Box paddingX={1} justifyContent="space-between">
         <Box>

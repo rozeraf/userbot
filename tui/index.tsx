@@ -12,18 +12,6 @@ import { MessagesPanel }     from "./panels/MessagesPanel";
 import { LlmCallsPanel }     from "./panels/LlmCallsPanel";
 import { WaitingScreen }     from "./panels/WaitingScreen";
 
-// ── Graceful shutdown: Ctrl+C / SIGINT never crashes the terminal ──────────────
-process.on("SIGINT",  () => { process.exit(0); });
-process.on("SIGTERM", () => { process.exit(0); });
-process.on("uncaughtException", (err) => {
-  // Log to stderr (won't corrupt Ink's stdout rendering) then exit cleanly
-  process.stderr.write(`[TUI] Uncaught exception: ${err?.message ?? err}\n`);
-  process.exit(1);
-});
-process.on("unhandledRejection", (reason) => {
-  process.stderr.write(`[TUI] Unhandled rejection: ${reason}\n`);
-});
-
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
 interface StatusData {
@@ -205,7 +193,7 @@ function TuiApp() {
   const rightPanelNames = (["messages", "llmCalls", "eventLog", "commandQueue"] as PanelName[])
     .filter((p) => visiblePanels.has(p));
   const panelH = rightPanelNames.length > 0
-    ? Math.max(6, Math.floor(availH / rightPanelNames.length))
+    ? Math.max(1, Math.floor(availH / rightPanelNames.length))
     : availH;
 
   const focusLabel =
@@ -241,7 +229,7 @@ function TuiApp() {
         {/* Left: Status snapshot — fixed width, full height */}
         {visiblePanels.has("status") && (
           <Box borderStyle="round" borderColor={statusPanelColor} flexDirection="column"
-               width={26} height={availH} paddingX={1} marginRight={1} overflow="hidden">
+               width={26} height={availH} flexShrink={0} paddingX={1} marginRight={1} overflow="hidden">
             <Text bold color={statusPanelColor}>📊 [1] Status</Text>
             <Box flexDirection="column" marginTop={1}>
               <Text>Status:{" "}<Text bold color={headerStatusColor}>{data.isStale ? "DISCO" : data.status.toUpperCase()}</Text></Text>
@@ -267,7 +255,7 @@ function TuiApp() {
         )}
 
         {/* Right: stacked panels, each with exact equal height */}
-        <Box flexDirection="column" flexGrow={1} height={availH} overflow="hidden">
+        <Box flexDirection="column" flexGrow={1} minWidth={0} height={availH} overflow="hidden">
           {visiblePanels.has("messages") && (
             <MessagesPanel height={panelH} isFocused={msgFocused} />
           )}
@@ -303,4 +291,20 @@ function TuiApp() {
   );
 }
 
-render(<TuiApp />);
+const tui = render(<TuiApp />);
+
+// Let Ink restore raw mode and the cursor before the process terminates.
+const shutdown = (exitCode: number) => {
+  tui.unmount();
+  process.exitCode = exitCode;
+};
+
+process.once("SIGINT",  () => shutdown(0));
+process.once("SIGTERM", () => shutdown(0));
+process.once("uncaughtException", (err) => {
+  process.stderr.write(`[TUI] Uncaught exception: ${err?.message ?? err}\n`);
+  shutdown(1);
+});
+process.on("unhandledRejection", (reason) => {
+  process.stderr.write(`[TUI] Unhandled rejection: ${reason}\n`);
+});

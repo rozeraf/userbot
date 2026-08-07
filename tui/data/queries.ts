@@ -1,6 +1,6 @@
-import { asc, desc, eq, gt, like } from "drizzle-orm";
+import { asc, desc, eq, gt } from "drizzle-orm";
 import { getDb } from "../core/db";
-import { chatSummary, eventLog, llmCalls, messages, statusSnapshot } from "../../src/core/db/schema";
+import { chatSummary, commandExecutions, eventLog, llmCalls, messages, statusSnapshot } from "../../src/core/db/schema";
 
 type ReadDb = NonNullable<ReturnType<typeof getDb>>;
 
@@ -107,17 +107,12 @@ export function loadErrorEvents(limit: number): EventRow[] | null {
     .all());
 }
 
-export function loadCommandEvents() {
-  return read((db) => db.select({
-    id: eventLog.id,
-    eventType: eventLog.eventType,
-    message: eventLog.message,
-    metadata: eventLog.metadata,
-    timestamp: eventLog.timestamp,
-  })
-    .from(eventLog)
-    .where(like(eventLog.eventType, "command_%"))
-    .orderBy(desc(eventLog.id))
+/** Durable command state; unlike the event-log projection this cannot lose a
+ * long-running command when its start event falls outside a fixed log window. */
+export function loadCommandExecutions() {
+  return read((db) => db.select()
+    .from(commandExecutions)
+    .orderBy(desc(commandExecutions.startedAt))
     .limit(200)
     .all());
 }

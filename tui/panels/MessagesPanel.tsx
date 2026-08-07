@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { loadChats, loadMessages } from "../data/queries";
 import { POLL_CHATLIST_MS, POLL_MSGFEED_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
@@ -50,7 +50,6 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
   // ── Message list state ─────────────────────────────────────────────────────
   const [msgBuffer,  setMsgBuffer] = useState<MessageRow[]>([]);
   const [msgCursor,  setMsgCursor] = useState(0);
-  const lastMsgIdRef               = useRef(0);
   const [page, setPage]            = useState(0); // 0 = newest
 
   // ── Poll chat summaries ────────────────────────────────────────────────────
@@ -73,14 +72,20 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
   useEffect(() => {
     if (!selectedChat) return;
     let active = true;
-    lastMsgIdRef.current = 0;
     setMsgBuffer([]);
     setMsgCursor(0);
     setPage(0);
+    let initialFetch = true;
 
     const fetchMsgs = () => {
       const rows = loadMessages(selectedChat.chatId);
-      if (active && rows) setMsgBuffer(rows);
+      if (active && rows) {
+        setMsgBuffer(rows);
+        if (initialFetch) {
+          setMsgCursor(Math.max(0, Math.min(PAGE_SIZE, rows.length) - 1));
+          initialFetch = false;
+        }
+      }
     };
 
     fetchMsgs();
@@ -104,8 +109,12 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
   const chatScrollTop  = Math.max(0, chatCursor - Math.floor(chatListH / 2));
   const visibleChats   = chats.slice(chatScrollTop, chatScrollTop + chatListH);
 
-  // Visible slice for message area (last msgAreaH rows of page)
-  const visibleMsgs    = pageSlice.slice(Math.max(0, pageSlice.length - msgAreaH));
+  // Keep the selected message inside the viewport.
+  const msgScrollTop = Math.max(0, Math.min(
+    safeMsgCursor - Math.floor(msgAreaH / 2),
+    pageSlice.length - msgAreaH,
+  ));
+  const visibleMsgs = pageSlice.slice(msgScrollTop, msgScrollTop + msgAreaH);
 
   // ── Keyboard ───────────────────────────────────────────────────────────────
 
@@ -141,8 +150,14 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
       if (isDown)     { setMsgCursor((c) => Math.min(pageSlice.length - 1, c + 1)); return; }
       if (isTop)      { setMsgCursor(0); return; }
       if (isBottom)   { setMsgCursor(pageSlice.length - 1); return; }
-      if (isPageUp)   { setPage((p) => (pageStart > 0 ? p + 1 : p)); return; }
-      if (isPageDown) { setPage((p) => Math.max(0, p - 1)); return; }
+      if (isPageUp)   {
+        if (pageStart > 0) { setPage((p) => p + 1); setMsgCursor(PAGE_SIZE - 1); }
+        return;
+      }
+      if (isPageDown) {
+        if (page > 0) { setPage((p) => p - 1); setMsgCursor(Math.min(PAGE_SIZE, msgBuffer.length) - 1); }
+        return;
+      }
     }
   }, { isActive: isFocused });
 
@@ -152,7 +167,7 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
-         height={height} overflow="hidden">
+         height={height} flexShrink={0} overflow="hidden">
       {/* Title */}
       <Box paddingX={1} justifyContent="space-between">
         <Text bold color="yellow">
@@ -206,7 +221,7 @@ export function MessagesPanel({ height = 24, isFocused }: Props) {
             <Text color="gray">No messages.</Text>
           ) : (
             visibleMsgs.map((msg, visIdx) => {
-              const absIdx    = pageSlice.length - visibleMsgs.length + visIdx;
+              const absIdx    = msgScrollTop + visIdx;
               const isSelected = isFocused && side === "messages" && absIdx === safeMsgCursor;
               const who       = msg.isOutgoing
                 ? "You"

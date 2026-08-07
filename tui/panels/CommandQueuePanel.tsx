@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { loadCommandEvents } from "../data/queries";
+import { loadCommandExecutions } from "../data/queries";
 import { POLL_CMDQUEUE_MS, POLL_UNFOCUSED_MULTIPLIER } from "../core/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -172,8 +172,19 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
     let active = true;
 
     const fetch = () => {
-      const rows = loadCommandEvents();
-      if (active && rows) setEntries(buildQueue(rows));
+      const rows = loadCommandExecutions();
+      if (active && rows) setEntries(rows.map((row) => ({
+        correlationId: row.correlationId,
+        commandName: row.commandName,
+        chatId: row.chatId,
+        inputText: "",
+        status: row.status === "succeeded" ? "done" : row.status === "failed" ? "error" : "running",
+        startTs: row.startedAt,
+        endTs: row.finishedAt ?? null,
+        durationMs: row.finishedAt == null ? null : row.finishedAt - row.startedAt,
+        errorMsg: row.error ?? null,
+        startEventId: row.id,
+      })));
     };
 
     fetch();
@@ -215,7 +226,7 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={borderColor}
-         height={height} overflow="hidden">
+         height={height} flexShrink={0} overflow="hidden">
       {/* Title */}
       <Box paddingX={1} justifyContent="space-between">
         <Text bold color={borderColor}>

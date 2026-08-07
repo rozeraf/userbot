@@ -15,13 +15,18 @@ const DEFAULT_CONFIG: TuiConfig = {
   visiblePanels: ["status", "messages", "llmCalls", "eventLog", "commandQueue"]
 };
 
+const PANEL_NAMES = new Set<PanelName>(DEFAULT_CONFIG.visiblePanels);
+
 export function loadTuiConfig(): TuiConfig {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, "utf-8");
       const parsed = JSON.parse(data) as TuiConfig;
       if (Array.isArray(parsed.visiblePanels)) {
-        return parsed;
+        const visiblePanels = parsed.visiblePanels.filter(
+          (panel): panel is PanelName => typeof panel === "string" && PANEL_NAMES.has(panel as PanelName),
+        );
+        return { visiblePanels };
       }
     }
   } catch (err) {
