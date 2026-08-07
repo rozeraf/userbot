@@ -1,9 +1,10 @@
-import { closeDb, db, secureDbFiles, sqlite } from "./client";
+import { closeDb, db, secureDbFiles } from "./client";
 import { chatSummary, messages, llmCalls, eventLog, statusSnapshot, commandExecutions } from "./schema";
 import type { NewMessage, NewLLMCall, NewEvent } from "./schema";
 import { state } from "../state";
 import { ENV } from "../../config/env";
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { writeTransaction } from "./writer";
 
 // Re-export the write-side database API for bot-only consumers.
 export { db } from "./client";
@@ -114,7 +115,7 @@ export const database = {
   },
 
   rebuildChatSummary() {
-    db.transaction((tx) => {
+    writeTransaction((tx, changed) => {
       tx.delete(chatSummary).run();
       tx.run(sql`
         INSERT INTO chat_summary (chat_id, chat_title, last_timestamp, message_count)
@@ -125,6 +126,7 @@ export const database = {
         FROM messages
         GROUP BY chat_id
       `);
+      changed.mark("chats");
     });
   },
 
@@ -159,37 +161,42 @@ export const database = {
     correlationId: string;
     provider: "gemini" | "cerebras";
   }): boolean {
-    const result = sqlite.run(
-      `INSERT INTO command_executions
-        (chat_id, message_id, command_name, correlation_id, provider, status, started_at)
-       VALUES (?, ?, ?, ?, ?, 'running', ?)
-       ON CONFLICT(chat_id, message_id) DO NOTHING`,
-      [input.chatId, input.messageId, input.commandName, input.correlationId, input.provider, Date.now()],
-    );
-    return result.changes > 0;
+    return writeTransaction((tx, changed) => {
+      const inserted = tx.insert(commandExecutions).values({
+        ...input,
+        status: "running",
+        startedAt: Date.now(),
+      }).onConflictDoNothing().returning({ id: commandExecutions.id }).all();
+      if (inserted.length > 0) changed.mark("commands");
+      return inserted.length > 0;
+    });
   },
 
   finishCommand(chatId: string, messageId: number, status: "succeeded" | "failed", error?: string) {
-    db.update(commandExecutions)
-      .set({ status, error: error ?? null, finishedAt: Date.now() })
-      .where(and(eq(commandExecutions.chatId, chatId), eq(commandExecutions.messageId, messageId)))
-      .run();
+    writeTransaction((tx, changed) => {
+      const updated = tx.update(commandExecutions)
+        .set({ status, error: error ?? null, finishedAt: Date.now() })
+        .where(and(eq(commandExecutions.chatId, chatId), eq(commandExecutions.messageId, messageId)))
+        .returning({ id: commandExecutions.id }).all();
+      if (updated.length > 0) changed.mark("commands");
+    });
   },
 
   recoverInterruptedCommands() {
-    const now = Date.now();
-    const result = sqlite.run(
-      `UPDATE command_executions
-       SET status = 'failed', error = ?, finished_at = ?
-       WHERE status = 'running'`,
-      ["Process interrupted before command completion", now],
-    );
-    if (result.changes > 0) {
+    const recovered = writeTransaction((tx, changed) => {
+      const rows = tx.update(commandExecutions)
+        .set({ status: "failed", error: "Process interrupted before command completion", finishedAt: Date.now() })
+        .where(eq(commandExecutions.status, "running"))
+        .returning({ id: commandExecutions.id }).all();
+      if (rows.length > 0) changed.mark("commands");
+      return rows.length;
+    });
+    if (recovered > 0) {
       database.logEvent({
         eventType: "commands_recovered",
         level: "warn",
         category: "system",
-        message: `Marked ${result.changes} interrupted command(s) as failed`,
+        message: `Marked ${recovered} interrupted command(s) as failed`,
       });
     }
   },
@@ -237,41 +244,38 @@ export const database = {
     const provider = state.getProvider();
     const memoryMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
 
+    const updatedAt = Date.now();
+    const next = {
+      id: 1,
+      status: botStatus,
+      provider,
+      connectedSince,
+      pingMs,
+      incomingCount,
+      outgoingCount,
+      aiRequestCount,
+      errorCount,
+      eventCount,
+      queueState,
+      memoryMb,
+      updatedAt,
+    };
+
     try {
-      db.insert(statusSnapshot)
-        .values({
-          id: 1,
-          status: botStatus,
-          provider,
-          connectedSince,
-          pingMs,
-          incomingCount,
-          outgoingCount,
-          aiRequestCount,
-          errorCount,
-          eventCount,
-          queueState,
-          memoryMb,
-          updatedAt: Date.now(),
-        })
-        .onConflictDoUpdate({
-          target: statusSnapshot.id,
-          set: {
-            status: botStatus,
-            provider,
-            connectedSince,
-            pingMs,
-            incomingCount,
-            outgoingCount,
-            aiRequestCount,
-            errorCount,
-            eventCount,
-            queueState,
-            memoryMb,
-            updatedAt: Date.now(),
-          }
-        })
-        .run();
+      writeTransaction((tx, changed) => {
+        const current = tx.select().from(statusSnapshot).where(eq(statusSnapshot.id, 1)).all()[0];
+        const statusChanged = !current || current.status !== next.status || current.provider !== next.provider
+          || current.connectedSince !== next.connectedSince || current.incomingCount !== next.incomingCount
+          || current.outgoingCount !== next.outgoingCount || current.aiRequestCount !== next.aiRequestCount
+          || current.errorCount !== next.errorCount || current.eventCount !== next.eventCount
+          || current.queueState !== next.queueState;
+        const metricsChanged = !current || current.pingMs !== next.pingMs || current.memoryMb !== next.memoryMb
+          || current.updatedAt !== next.updatedAt;
+        if (!statusChanged && !metricsChanged) return;
+        tx.insert(statusSnapshot).values(next).onConflictDoUpdate({ target: statusSnapshot.id, set: next }).run();
+        if (statusChanged) changed.mark("status");
+        if (metricsChanged) changed.mark("runtime_metrics");
+      });
     } catch (err) {
       console.error("[db] Failed to update status_snapshot:", err);
     }
@@ -286,7 +290,7 @@ export const database = {
     const events = eventLogBuffer.splice(0);
 
     try {
-      db.transaction((tx) => {
+      writeTransaction((tx, changed) => {
         if (msgs.length) {
           // Only update summaries for rows SQLite actually inserted.  Telegram
           // can redeliver updates, and counting the input buffer here would
@@ -303,6 +307,7 @@ export const database = {
 
           const summaries = new Map<string, { lastTimestamp: number; chatTitle: string | null; messageCount: number }>();
           for (const message of insertedMessages) {
+            changed.mark("messages", message.chatId);
             const previous = summaries.get(message.chatId);
             const timestamp = message.telegramTimestamp ?? message.timestamp;
             summaries.set(message.chatId, {
@@ -325,9 +330,16 @@ export const database = {
               })
               .run();
           }
+          if (insertedMessages.length > 0) changed.mark("chats");
         }
-        if (calls.length)  tx.insert(llmCalls).values(calls).run();
-        if (events.length) tx.insert(eventLog).values(events).run();
+        if (calls.length) {
+          tx.insert(llmCalls).values(calls).run();
+          changed.mark("llm_calls");
+        }
+        if (events.length) {
+          tx.insert(eventLog).values(events).run();
+          changed.mark("events");
+        }
       });
       secureDbFiles();
       consecutiveFlushFailures = 0;
@@ -350,7 +362,11 @@ export const database = {
     if (ENV.DB_RETENTION_DAYS === 0) return;
     const cutoff = Date.now() - ENV.DB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     try {
-      db.transaction((tx) => {
+      writeTransaction((tx, changed) => {
+        const affectedChats = tx.selectDistinct({ chatId: messages.chatId })
+          .from(messages)
+          .where(sql`${messages.timestamp} < ${cutoff}`)
+          .all();
         tx.delete(messages).where(sql`${messages.timestamp} < ${cutoff}`).run();
         // Retention is infrequent, so rebuilding once is simpler and keeps the
         // denormalized TUI summary exact even when a chat is fully removed.
@@ -367,6 +383,11 @@ export const database = {
         tx.delete(llmCalls).where(sql`${llmCalls.timestamp} < ${cutoff}`).run();
         tx.delete(eventLog).where(sql`${eventLog.timestamp} < ${cutoff}`).run();
         tx.delete(commandExecutions).where(sql`${commandExecutions.startedAt} < ${cutoff}`).run();
+        for (const { chatId } of affectedChats) changed.mark("messages", chatId);
+        changed.mark("chats");
+        changed.mark("llm_calls");
+        changed.mark("events");
+        changed.mark("commands");
       });
       database.logEvent({
         eventType: "db_retention_prune",

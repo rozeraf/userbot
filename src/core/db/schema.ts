@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, index, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const messages = sqliteTable(
   "messages",
@@ -112,6 +112,24 @@ export const statusSnapshot = sqliteTable(
     memoryMb: integer("memory_mb").notNull(),
     updatedAt: integer("updated_at").notNull(),
   }
+);
+
+export const appMeta = sqliteTable(
+  "app_meta",
+  {
+    key: text("key").primaryKey(),
+    value: text("value").notNull(),
+  },
+);
+
+export const tuiRevisions = sqliteTable(
+  "tui_revisions",
+  {
+    resource: text("resource").notNull(),
+    scope: text("scope").notNull().default(""),
+    revision: integer("revision").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.resource, t.scope] })],
 );
 
 // Infer insert types directly from schema — no manual interfaces needed
