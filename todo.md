@@ -2,22 +2,6 @@
 
 Активные задачи расположены по приоритету. Статусы: `planned`, `research`, `in progress`, `blocked`. При начале работы задача получает владельца/ветку и проверяемые критерии готовности; завершённая работа переносится в «Готово».
 
-## P1 · Userbot Workspace — planned
-
-Цель: отдельный приватный supergroup-форум как безопасный интерфейс юзербота вместо «Избранного».
-
-- [ ] Создать приватную supergroup с forum mode.
-- [ ] Идемпотентно создавать топики `Chat`, `Saved`, `Media`, `System`.
-- [ ] Хранить workspace `chatId` и topic ID, не полагаться на названия.
-- [ ] Разрешить в `Chat` обычное общение без `!`-команд.
-- [ ] Использовать `Saved` и `Media` как тихие хранилища.
-- [ ] Отправлять логи, ошибки и служебные уведомления в `System`.
-- [ ] Вне workspace реагировать только на явно вызванные `.commands`.
-- [ ] Вынести управление и routing по topic ID в `core/workspace`.
-- [ ] Добавить recovery-тесты для повторного запуска и отсутствующих топиков.
-
-Готово, когда повторная инициализация не создаёт дубликаты, удалённый базовый топик восстанавливается, а маршрутизация проверена тестами.
-
 ## P1 · Summary последних сообщений — planned
 
 - [ ] Поддержать `.summarize N` для последних `N` сообщений текущего чата или топика.
@@ -61,6 +45,7 @@
 
 ## Готово
 
+- [x] Приватный forum `Userbot Workspace`: idempotent `Chat/Saved/Media/System`, routing по сохранённым ID, plain-text LLM chat, тихие хранилища, System notifications и recovery tests.
 - [x] Native `.remind`: scheduled message в «Избранном», диапазон 10 секунд–365 дней, единицы `s/с`, `m/м`, `h/ч`, `d/д`.
 - [x] Durable command execution и восстановление прерванных команд.
 - [x] Scoped TUI revisions, coalesced UDS wakeups и `data_version` watchdog.

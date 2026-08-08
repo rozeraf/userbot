@@ -4,7 +4,7 @@ Telegram userbot, работающий под твоим личным аккау
 
 Поддерживает **Gemini** (Google) и **Cerebras** как провайдеры; переключаются на лету командой прямо в Telegram. Весь трафик (сообщения, вызовы LLM, события) логируется в локальную SQLite-базу через [Drizzle ORM](https://orm.drizzle.team/).
 
-Документы проекта: [правила разработки](CONTRIBUTING.md), [roadmap](todo.md), [синхронизация TUI](docs/tui-sync.md).
+Документы проекта: [правила разработки](CONTRIBUTING.md), [roadmap](todo.md), [Userbot Workspace](docs/workspace.md), [синхронизация TUI](docs/tui-sync.md).
 
 ## Быстрый старт
 
@@ -37,6 +37,11 @@ bun run tui
 | `.help` | Показывает список всех команд |
 
 > Бот реагирует **только на твои собственные сообщения** (`message.out`). На чужие команды не реагирует.
+
+После первого авторизованного запуска бот также создаёт приватный forum
+`Userbot Workspace`. В его топике `Chat` можно писать без command prefix;
+`Saved` и `Media` работают как тихие хранилища, а `System` принимает ошибки и
+служебные уведомления. Подробности — в [docs/workspace.md](docs/workspace.md).
 
 ---
 

@@ -1,7 +1,6 @@
 import { randomBytes } from "crypto";
 import bigInt from "big-integer";
 import { Api, utils, type TelegramClient } from "telegram";
-import { loadWorkspaceConfig, saveWorkspaceConfig } from "./store";
 import { createWorkspaceRouter } from "./router";
 import type { WorkspaceConfig, WorkspaceRole, WorkspaceRouter } from "./types";
 import { workspaceInputChannel } from "./peer";
@@ -12,6 +11,11 @@ const TOPIC_TITLES: Record<WorkspaceRole, string> = {
   saved: "Saved",
   media: "Media",
   system: "System",
+};
+
+export type WorkspacePersistence = {
+  load(): WorkspaceConfig | null;
+  save(config: WorkspaceConfig): void;
 };
 
 function updatesOf(result: Api.TypeUpdates): Api.TypeUpdate[] {
@@ -45,7 +49,7 @@ function newRandomId(): string {
   return bigInt(bytes.toString("hex"), 16).toString();
 }
 
-async function createWorkspace(client: TelegramClient): Promise<WorkspaceConfig> {
+async function createWorkspace(client: TelegramClient, persistence: WorkspacePersistence): Promise<WorkspaceConfig> {
   const result = await client.invoke(new Api.channels.CreateChannel({
     title: WORKSPACE_TITLE,
     about: "Private workspace managed by tg-userbot",
@@ -61,7 +65,7 @@ async function createWorkspace(client: TelegramClient): Promise<WorkspaceConfig>
     topics: { chat: 1 },
     topicRandomIds: {},
   };
-  saveWorkspaceConfig(config);
+  persistence.save(config);
   await client.invoke(new Api.channels.EditForumTopic({
     channel: workspaceInputChannel(config),
     topicId: 1,
@@ -99,6 +103,7 @@ async function ensureTopic(
   client: TelegramClient,
   config: WorkspaceConfig,
   role: Exclude<WorkspaceRole, "chat">,
+  persistence: WorkspacePersistence,
 ): Promise<void> {
   const existingId = config.topics[role];
   if (existingId && await getTopic(client, config, existingId)) return;
@@ -106,7 +111,7 @@ async function ensureTopic(
   const randomId = config.topicRandomIds[role] ?? newRandomId();
   config.topicRandomIds[role] = randomId;
   delete config.topics[role];
-  saveWorkspaceConfig(config);
+  persistence.save(config);
 
   const result = await client.invoke(new Api.channels.CreateForumTopic({
     channel: workspaceInputChannel(config),
@@ -114,18 +119,21 @@ async function ensureTopic(
     randomId: bigInt(randomId),
   }));
   config.topics[role] = createdTopicId(result, randomId);
-  saveWorkspaceConfig(config);
+  persistence.save(config);
 }
 
-export async function initializeWorkspace(client: TelegramClient): Promise<WorkspaceRouter> {
-  const config = loadWorkspaceConfig() ?? await createWorkspace(client);
+export async function initializeWorkspaceCore(
+  client: TelegramClient,
+  persistence: WorkspacePersistence,
+): Promise<WorkspaceRouter> {
+  const config = persistence.load() ?? await createWorkspace(client, persistence);
   await ensureForum(client, config);
 
   // The general topic is protocol-defined as ID 1. Store and validate the ID;
   // names are display metadata and are never used for routing.
   if (config.topics.chat !== 1) {
     config.topics.chat = 1;
-    saveWorkspaceConfig(config);
+    persistence.save(config);
   }
   const chatTopic = await getTopic(client, config, 1);
   if (!chatTopic) {
@@ -148,7 +156,7 @@ export async function initializeWorkspace(client: TelegramClient): Promise<Works
   }
 
   for (const role of ["saved", "media", "system"] as const) {
-    await ensureTopic(client, config, role);
+    await ensureTopic(client, config, role, persistence);
   }
   return createWorkspaceRouter(config);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { routeWorkspaceMessage } from "./router";
+import { Api } from "telegram";
+import { isQuietWorkspaceRole, messageTopicId, routeWorkspaceMessage, shouldRunWorkspaceChat } from "./router";
 import type { WorkspaceConfig } from "./types";
 
 const config: WorkspaceConfig = {
@@ -18,5 +19,22 @@ describe("workspace router", () => {
     expect(routeWorkspaceMessage(config, "-100999", 1)).toBeNull();
     expect(routeWorkspaceMessage(config, "-100123", 999)).toBeNull();
     expect(routeWorkspaceMessage(config, "-100123", null)).toBeNull();
+  });
+
+  test("extracts the forum root topic ID from Telegram reply metadata", () => {
+    expect(messageTopicId({ replyTo: new Api.MessageReplyHeader({
+      forumTopic: true, replyToMsgId: 99, replyToTopId: 1,
+    }) })).toBe(1);
+    expect(messageTopicId({ replyTo: undefined })).toBeNull();
+  });
+
+  test("allows plain Chat text and keeps storage topics quiet", () => {
+    expect(shouldRunWorkspaceChat("chat", "обычный вопрос")).toBeTrue();
+    expect(shouldRunWorkspaceChat("chat", ".status")).toBeFalse();
+    expect(shouldRunWorkspaceChat("saved", "обычный вопрос")).toBeFalse();
+    expect(isQuietWorkspaceRole("saved")).toBeTrue();
+    expect(isQuietWorkspaceRole("media")).toBeTrue();
+    expect(isQuietWorkspaceRole("system")).toBeTrue();
+    expect(isQuietWorkspaceRole("chat")).toBeFalse();
   });
 });

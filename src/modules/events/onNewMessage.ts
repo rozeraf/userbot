@@ -8,7 +8,9 @@ import { errorMessage, isLoggedCommandError } from "../../core/errors";
 import { consumeServiceMessage } from "../../core/telegram";
 import { state } from "../../core/state";
 import { COMMAND_PREFIX, commandText } from "../../config/commands";
-import { messageTopicId, type WorkspaceRouter } from "../../core/workspace";
+import {
+  isQuietWorkspaceRole, messageTopicId, shouldRunWorkspaceChat, type WorkspaceRouter,
+} from "../../core/workspace";
 import { workspaceChatCommand } from "../commands/workspaceChat";
 
 function normalizeText(text: string): string {
@@ -57,15 +59,14 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient, wor
   const isOutgoing = message.out ?? false;
   const isServiceMessage = isOutgoing && consumeServiceMessage(chatId, message.id);
   const workspaceRole = workspace?.route(chatId, messageTopicId(message)) ?? null;
-  const isQuietWorkspaceTopic = workspaceRole === "saved" || workspaceRole === "media" || workspaceRole === "system";
+  const isQuietWorkspaceTopic = isQuietWorkspaceRole(workspaceRole);
 
   // Synchronously determine if this is a command to lock its order in the queue
   let matchedCmd: typeof COMMANDS[number] | undefined;
   if (isOutgoing && !isServiceMessage && !isQuietWorkspaceTopic && text.startsWith(COMMAND_PREFIX)) {
     matchedCmd = COMMANDS.find((c) => c.match(text));
   }
-  if (!matchedCmd && isOutgoing && !isServiceMessage && workspaceRole === "chat"
-      && text && !text.startsWith(COMMAND_PREFIX)) {
+  if (!matchedCmd && isOutgoing && !isServiceMessage && shouldRunWorkspaceChat(workspaceRole, text)) {
     matchedCmd = workspaceChatCommand;
   }
 
