@@ -7,12 +7,12 @@ describe("command syntax", () => {
   });
 
   test("matches only a complete command token", () => {
-    expect(matchesCommand(`${COMMAND_PREFIX}answer`, "answer")).toBeTrue();
-    expect(matchesCommand(`${COMMAND_PREFIX}answer prompt`, "answer")).toBeTrue();
-    expect(matchesCommand(`${COMMAND_PREFIX}answering`, "answer")).toBeFalse();
+    expect(matchesCommand(`${COMMAND_PREFIX}ai`, "ai")).toBeTrue();
+    expect(matchesCommand(`${COMMAND_PREFIX}ai prompt`, "ai")).toBeTrue();
+    expect(matchesCommand(`${COMMAND_PREFIX}air`, "ai")).toBeFalse();
   });
 
   test("extracts trimmed arguments", () => {
-    expect(commandArgs(`${COMMAND_PREFIX}answer   hello`, "answer")).toBe("hello");
+    expect(commandArgs(`${COMMAND_PREFIX}ai   hello`, "ai")).toBe("hello");
   });
 });

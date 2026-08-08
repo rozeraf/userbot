@@ -3,15 +3,15 @@ import type { CommandModule } from "../types";
 import { commandArgs, commandText, matchesCommand } from "../../../config/commands";
 import { executeLlmReply } from "../llmReply";
 
-export const answerCommand: CommandModule = {
-  name: "answer",
-  match: (text) => matchesCommand(text, "answer"),
+export const aiCommand: CommandModule = {
+  name: "ai",
+  match: (text) => matchesCommand(text, "ai"),
   async run({ client, message, text, correlationId, provider }) {
-    const userPrompt = commandArgs(text, "answer");
+    const userPrompt = commandArgs(text, "ai");
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
 
-    console.log("[answer] trigger detected", {
+    console.log("[ai] trigger detected", {
       provider: undefined,
       userPromptPresent: Boolean(userPrompt),
       repliedPresent: Boolean(originalText),
@@ -21,21 +21,20 @@ export const answerCommand: CommandModule = {
     if (!userPrompt && !originalText) {
       try {
         await message.reply({
-          message: `Нужно либо ответить на сообщение, либо написать промпт после ${commandText("answer")}.`,
+          message: `Нужно либо ответить на сообщение, либо написать промпт после ${commandText("ai")}.`,
         });
       } catch (replyErr) {
-        console.error("[answer] failed to send input validation reply:", replyErr);
+        console.error("[ai] failed to send input validation reply:", replyErr);
       }
       return true;
     }
 
     const prompt = buildPrompt(userPrompt, originalText);
-
-    console.log("[answer] prompt length:", prompt.length);
+    console.log("[ai] prompt length:", prompt.length);
 
     await executeLlmReply({
-      client, message, prompt, replyToId: replied?.id, logPrefix: "answer", provider,
-      auditContext: { correlationId, commandName: "answer", chatId: message.chatId?.toString(), messageId: message.id },
+      client, message, prompt, replyToId: replied?.id, logPrefix: "ai", provider,
+      auditContext: { correlationId, commandName: "ai", chatId: message.chatId?.toString(), messageId: message.id },
       sendErrorMessage: "Ошибка при отправке ответа в Telegram.",
       llmErrorMessage: "Ошибка при обращении к LLM, смотри логи.",
     });
