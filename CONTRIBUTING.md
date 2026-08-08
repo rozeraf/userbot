@@ -55,7 +55,7 @@ SQL и Drizzle metadata коммитятся вместе со схемой. У�
 
 ## Telegram-команды
 
-Prefix и операции над синтаксисом централизованы в `src/config/commands.ts`. Новые команды должны использовать `commandText()`, `matchesCommand()` и `commandArgs()` вместо строковых литералов вроде `"!command"`. Пользовательские примеры в README и roadmap обновляются вместе с изменением prefix.
+Prefix и операции над синтаксисом централизованы в `src/config/commands.ts`. Новые команды должны использовать `commandText()`, `matchesCommand()` и `commandArgs()` вместо строковых литералов вроде `".command"`. Пользовательские примеры в README и roadmap обновляются вместе с изменением prefix.
 
 ## Ветки и выпуск
 

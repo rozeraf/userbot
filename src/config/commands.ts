@@ -1,5 +1,5 @@
 /** Single source of truth for Telegram command syntax. */
-export const COMMAND_PREFIX = "!" as const;
+export const COMMAND_PREFIX = "." as const;
 
 export function commandText(name: string): string {
   return `${COMMAND_PREFIX}${name}`;
