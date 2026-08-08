@@ -128,11 +128,18 @@ export async function initializeWorkspace(client: TelegramClient): Promise<Works
   if (!chatTopic) {
     throw new Error("Workspace forum has no general Chat topic");
   }
-  if (chatTopic.title !== TOPIC_TITLES.chat || chatTopic.hidden) {
+  if (chatTopic.title !== TOPIC_TITLES.chat) {
     await client.invoke(new Api.channels.EditForumTopic({
       channel: workspaceInputChannel(config),
       topicId: 1,
       title: TOPIC_TITLES.chat,
+    }));
+  }
+  // Telegram requires changing the General topic visibility in a separate RPC.
+  if (chatTopic.hidden) {
+    await client.invoke(new Api.channels.EditForumTopic({
+      channel: workspaceInputChannel(config),
+      topicId: 1,
       hidden: false,
     }));
   }
