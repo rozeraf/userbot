@@ -8,6 +8,8 @@ import { errorMessage, isLoggedCommandError } from "../../core/errors";
 import { consumeServiceMessage } from "../../core/telegram";
 import { state } from "../../core/state";
 import { COMMAND_PREFIX, commandText } from "../../config/commands";
+import { messageTopicId, type WorkspaceRouter } from "../../core/workspace";
+import { workspaceChatCommand } from "../commands/workspaceChat";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
@@ -45,7 +47,7 @@ function enqueueCommand(chatId: string, job: () => Promise<void>): void {
   });
 }
 
-export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
+export function onNewMessage(event: NewMessageEvent, client: TelegramClient, workspace?: WorkspaceRouter) {
   const message = event.message;
   if (!message) return;
 
@@ -54,11 +56,17 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
   const senderId = message.senderId?.toString() ?? "";
   const isOutgoing = message.out ?? false;
   const isServiceMessage = isOutgoing && consumeServiceMessage(chatId, message.id);
+  const workspaceRole = workspace?.route(chatId, messageTopicId(message)) ?? null;
+  const isQuietWorkspaceTopic = workspaceRole === "saved" || workspaceRole === "media" || workspaceRole === "system";
 
   // Synchronously determine if this is a command to lock its order in the queue
   let matchedCmd: typeof COMMANDS[number] | undefined;
-  if (isOutgoing && !isServiceMessage && text.startsWith(COMMAND_PREFIX)) {
+  if (isOutgoing && !isServiceMessage && !isQuietWorkspaceTopic && text.startsWith(COMMAND_PREFIX)) {
     matchedCmd = COMMANDS.find((c) => c.match(text));
+  }
+  if (!matchedCmd && isOutgoing && !isServiceMessage && workspaceRole === "chat"
+      && text && !text.startsWith(COMMAND_PREFIX)) {
+    matchedCmd = workspaceChatCommand;
   }
 
   // Names are display metadata, not part of command execution. Avoid a network
@@ -149,7 +157,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
       }
     });
   } else {
-    if (isOutgoing && !isServiceMessage && text.startsWith(COMMAND_PREFIX)) {
+    if (isOutgoing && !isServiceMessage && !isQuietWorkspaceTopic && text.startsWith(COMMAND_PREFIX)) {
       void message.reply({ message: `Неизвестная команда. Используй ${commandText("help")} для списка команд.` })
         .catch((err) => console.error("[event] failed to send unknown-command reply:", err));
     }

@@ -19,6 +19,7 @@ export type PendingLLMCall  = Omit<NewLLMCall,  "id" | "timestamp">;
 export type PendingEvent    = Omit<NewEvent,     "id" | "timestamp" | "metadata"> & {
   metadata?: Record<string, unknown> | null;
 };
+type SystemEventSink = (event: PendingEvent) => void | Promise<void>;
 
 // ── Buffers ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ let nextFlushAt = 0;
 let droppedRecords = 0;
 let lastDropWarningAt = 0;
 let nextRetentionPruneAt = 0;
+let systemEventSink: SystemEventSink | null = null;
 const RETENTION_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // ── In-Memory Counters & Status ───────────────────────────────────────────────
@@ -92,6 +94,10 @@ try {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const database = {
+  setSystemEventSink(sink: SystemEventSink | null) {
+    systemEventSink = sink;
+  },
+
   start() {
     if (isClosed) throw new Error("Cannot start a closed database");
     if (tickInterval) return;
@@ -232,6 +238,11 @@ export const database = {
       metadata: event.metadata != null ? JSON.stringify(event.metadata) : null,
       timestamp: Date.now(),
     });
+    if (systemEventSink && (event.level === "warn" || event.level === "error")) {
+      void Promise.resolve(systemEventSink(event)).catch((err) => {
+        console.error("[db] System event sink failed:", err);
+      });
+    }
     checkFlush();
   },
 

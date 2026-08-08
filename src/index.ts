@@ -7,6 +7,7 @@ import { ENV } from "./config/env";
 import { onNewMessage } from "./modules/events/onNewMessage";
 import { database } from "./core/db";
 import { startTuiSyncServer, type TuiSyncServer } from "./core/tuiSync/server";
+import { createWorkspaceSystemNotifier, initializeWorkspace, type WorkspaceRouter } from "./core/workspace";
 
 let isShuttingDown = false;
 let tuiSyncServer: TuiSyncServer | null = null;
@@ -132,8 +133,32 @@ async function main() {
     metadata: { initialProvider: ENV.LLM_PROVIDER },
   });
 
+  let workspace: WorkspaceRouter | undefined;
+  try {
+    workspace = await initializeWorkspace(client);
+    const systemNotifier = createWorkspaceSystemNotifier(client, workspace);
+    database.setSystemEventSink((event) => systemNotifier.notifyEvent(event));
+    void systemNotifier.notify("✅ tg-userbot workspace ready").catch(() => {});
+    console.log("[workspace] ready:", workspace.config.chatId, workspace.config.topics);
+    database.logEvent({
+      eventType: "workspace_ready",
+      level: "info",
+      category: "system",
+      message: "Userbot Workspace initialized",
+      metadata: { chatId: workspace.config.chatId, topics: workspace.config.topics },
+    });
+  } catch (err) {
+    console.error("[workspace] initialization failed:", err);
+    database.logEvent({
+      eventType: "workspace_init_error",
+      level: "error",
+      category: "error",
+      message: `Workspace initialization failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+
   client.addEventHandler(
-    (event) => onNewMessage(event, client),
+    (event) => onNewMessage(event, client, workspace),
     new NewMessage({})
   );
 
