@@ -25,8 +25,11 @@ function createdChannel(result: Api.TypeUpdates): Api.Channel {
   return channel;
 }
 
-function createdTopicId(result: Api.TypeUpdates): number {
+function createdTopicId(result: Api.TypeUpdates, randomId: string): number {
   for (const update of updatesOf(result)) {
+    if (update instanceof Api.UpdateMessageID && update.randomId?.toString() === randomId) {
+      return update.id;
+    }
     if (update instanceof Api.UpdateNewChannelMessage
         && update.message instanceof Api.Message
         && update.message.action instanceof Api.MessageActionTopicCreate) {
@@ -110,7 +113,7 @@ async function ensureTopic(
     title: TOPIC_TITLES[role],
     randomId: bigInt(randomId),
   }));
-  config.topics[role] = createdTopicId(result);
+  config.topics[role] = createdTopicId(result, randomId);
   saveWorkspaceConfig(config);
 }
 
