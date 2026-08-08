@@ -8,11 +8,13 @@ describe("workspace config", () => {
       chatId: "-100123",
       channelId: "123",
       accessHash: "456",
-      topics: { chat: 1, saved: 10 },
-      topicRandomIds: { saved: "789" },
+      topics: { chat: 1, saved: 10, settings: 11 },
+      topicRandomIds: { saved: "789", settings: "790" },
     }));
     expect(config?.topics.saved).toBe(10);
     expect(config?.topicRandomIds.saved).toBe("789");
+    expect(config?.topics.settings).toBe(11);
+    expect(config?.topicRandomIds.settings).toBe("790");
   });
 
   test("rejects corrupt topic and random IDs", () => {

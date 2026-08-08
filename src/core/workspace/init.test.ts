@@ -19,7 +19,7 @@ describe("workspace initialization", () => {
       chatId: "-100123",
       channelId: "123",
       accessHash: "456",
-      topics: { chat: 1, saved: 4, system: 6 },
+      topics: { chat: 1, saved: 4, settings: 7, system: 6 },
       topicRandomIds: { media: "777" },
     };
     let createCalls = 0;
@@ -33,7 +33,7 @@ describe("workspace initialization", () => {
         }
         if (request instanceof Api.channels.GetForumTopicsByID) {
           const id = request.topics[0]!;
-          return topicsResult([topic(id, id === 1 ? "Chat" : id === 4 ? "Saved" : "System")]);
+          return topicsResult([topic(id, id === 1 ? "Chat" : id === 4 ? "Saved" : id === 7 ? "Settings" : "System")]);
         }
         if (request instanceof Api.channels.CreateForumTopic) {
           createCalls++;
@@ -52,7 +52,7 @@ describe("workspace initialization", () => {
     });
 
     expect(createCalls).toBe(1);
-    expect(workspace.config.topics).toEqual({ chat: 1, saved: 4, media: 5, system: 6 });
+    expect(workspace.config.topics).toEqual({ chat: 1, saved: 4, media: 5, settings: 7, system: 6 });
     expect(saved.at(-1)?.topics.media).toBe(5);
   });
 });

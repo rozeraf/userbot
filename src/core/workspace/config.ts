@@ -16,7 +16,7 @@ export function parseWorkspaceConfig(value: string): WorkspaceConfig | null {
     }
     const topicRandomIds: WorkspaceConfig["topicRandomIds"] = {};
     if (parsed.topicRandomIds && typeof parsed.topicRandomIds === "object") {
-      for (const role of ["saved", "media", "system"] as const) {
+      for (const role of ["saved", "media", "settings", "system"] as const) {
         const randomId = parsed.topicRandomIds[role];
         if (randomId != null) {
           if (typeof randomId !== "string" || !/^\d+$/.test(randomId)) return null;

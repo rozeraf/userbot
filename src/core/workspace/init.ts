@@ -10,6 +10,7 @@ const TOPIC_TITLES: Record<WorkspaceRole, string> = {
   chat: "Chat",
   saved: "Saved",
   media: "Media",
+  settings: "Settings",
   system: "System",
 };
 
@@ -155,7 +156,7 @@ export async function initializeWorkspaceCore(
     }));
   }
 
-  for (const role of ["saved", "media", "system"] as const) {
+  for (const role of ["saved", "media", "settings", "system"] as const) {
     await ensureTopic(client, config, role, persistence);
   }
   return createWorkspaceRouter(config);

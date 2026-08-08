@@ -40,8 +40,9 @@ bun run tui
 
 После первого авторизованного запуска бот также создаёт приватный forum
 `Userbot Workspace`. В его топике `Chat` можно писать без command prefix;
-`Saved` и `Media` работают как тихие хранилища, а `System` принимает ошибки и
-служебные уведомления. Подробности — в [docs/workspace.md](docs/workspace.md).
+`Saved` и `Media` работают как тихие хранилища, `Settings` принимает явные
+`.commands`, а `System` — ошибки и служебные уведомления. Подробности — в
+[docs/workspace.md](docs/workspace.md).
 
 ---
 

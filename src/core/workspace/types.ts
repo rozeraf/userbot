@@ -1,4 +1,4 @@
-export const WORKSPACE_ROLES = ["chat", "saved", "media", "system"] as const;
+export const WORKSPACE_ROLES = ["chat", "saved", "media", "settings", "system"] as const;
 export type WorkspaceRole = typeof WORKSPACE_ROLES[number];
 
 export type WorkspaceConfig = {
