@@ -1,12 +1,13 @@
 import { buildPrompt } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
+import { commandArgs, commandText, matchesCommand } from "../../../config/commands";
 import { executeLlmReply } from "../llmReply";
 
 export const answerCommand: CommandModule = {
   name: "answer",
-  match: (text) => text === "!answer" || text.startsWith("!answer "),
+  match: (text) => matchesCommand(text, "answer"),
   async run({ client, message, text, correlationId, provider }) {
-    const userPrompt = text.slice("!answer".length).trim();
+    const userPrompt = commandArgs(text, "answer");
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
 
@@ -20,7 +21,7 @@ export const answerCommand: CommandModule = {
     if (!userPrompt && !originalText) {
       try {
         await message.reply({
-          message: "Нужно либо ответить на сообщение, либо написать промпт после !answer.",
+          message: `Нужно либо ответить на сообщение, либо написать промпт после ${commandText("answer")}.`,
         });
       } catch (replyErr) {
         console.error("[answer] failed to send input validation reply:", replyErr);

@@ -159,6 +159,7 @@ journalctl --user -u tg-userbot -f
 src/
 ├── index.ts                    # Точка входа: инициализация клиента, авторизация
 ├── config/
+│   ├── commands.ts             # COMMAND_PREFIX и helpers синтаксиса команд
 │   └── env.ts                  # Валидация переменных окружения
 ├── core/
 │   ├── db/

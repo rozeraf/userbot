@@ -1,11 +1,12 @@
 import type { CommandModule } from "../types";
+import { commandArgs, commandText, matchesCommand } from "../../../config/commands";
 import { parseReminderInput } from "./parse";
 
 export const remindCommand: CommandModule = {
   name: "remind",
-  match: (text) => text === "!remind" || text.startsWith("!remind "),
+  match: (text) => matchesCommand(text, "remind"),
   async run({ client, message, text }) {
-    const userInput = text.slice("!remind".length).replace(/[\r\n]+/g, " ").trim();
+    const userInput = commandArgs(text, "remind").replace(/[\r\n]+/g, " ").trim();
 
     console.log("[remind] trigger detected", {
       userInputPresent: Boolean(userInput),
@@ -16,7 +17,7 @@ export const remindCommand: CommandModule = {
     if (!parsed) {
       try {
         await message.reply({
-          message: "Использование: !remind <время> <текст>\nЕдиницы: s/с, m/м, h/ч, d/д\nПример: !remind 20m Позвонить маме",
+          message: `Использование: ${commandText("remind")} <время> <текст>\nЕдиницы: s/с, m/м, h/ч, d/д\nПример: ${commandText("remind")} 20m Позвонить маме`,
         });
       } catch (replyErr) {
         console.error("[remind] failed to send input validation reply:", replyErr);

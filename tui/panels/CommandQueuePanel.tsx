@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { COMMAND_PREFIX } from "../../src/config/commands";
 import { Box, Text, useInput } from "ink";
 import { loadCommandExecutions } from "../data/queries";
 import { useRevision } from "../core/revisions";
@@ -254,7 +255,7 @@ export function CommandQueuePanel({ height = 20, isFocused }: Props) {
       {/* Rows */}
       <Box flexDirection="column" paddingX={1}>
         {visible.length === 0 ? (
-          <Text color="gray">No command events yet. Run any !command via Telegram.</Text>
+          <Text color="gray">No command events yet. Run any {COMMAND_PREFIX}command via Telegram.</Text>
         ) : (
           visible.map((entry, visIdx) => {
             const absIdx     = scrollTop + visIdx;

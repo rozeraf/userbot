@@ -7,6 +7,7 @@ import { randomBytes } from "crypto";
 import { errorMessage, isLoggedCommandError } from "../../core/errors";
 import { consumeServiceMessage } from "../../core/telegram";
 import { state } from "../../core/state";
+import { COMMAND_PREFIX, commandText } from "../../config/commands";
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
@@ -56,7 +57,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
 
   // Synchronously determine if this is a command to lock its order in the queue
   let matchedCmd: typeof COMMANDS[number] | undefined;
-  if (isOutgoing && !isServiceMessage && text.startsWith("!")) {
+  if (isOutgoing && !isServiceMessage && text.startsWith(COMMAND_PREFIX)) {
     matchedCmd = COMMANDS.find((c) => c.match(text));
   }
 
@@ -148,8 +149,8 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient) {
       }
     });
   } else {
-    if (isOutgoing && !isServiceMessage && text.startsWith("!")) {
-      void message.reply({ message: "Неизвестная команда. Используй !help для списка команд." })
+    if (isOutgoing && !isServiceMessage && text.startsWith(COMMAND_PREFIX)) {
+      void message.reply({ message: `Неизвестная команда. Используй ${commandText("help")} для списка команд.` })
         .catch((err) => console.error("[event] failed to send unknown-command reply:", err));
     }
     // Non-command message: log asynchronously as soon as names are resolved, without blocking the queue

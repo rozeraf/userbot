@@ -1,11 +1,12 @@
 import type { CommandModule } from "../types";
+import { commandArgs, commandText, matchesCommand } from "../../../config/commands";
 import { executeLlmReply } from "../llmReply";
 
 export const translateCommand: CommandModule = {
   name: "translate",
-  match: (text) => text === "!translate" || text.startsWith("!translate "),
+  match: (text) => matchesCommand(text, "translate"),
   async run({ client, message, text, correlationId, provider }) {
-    const userInput = text.slice("!translate".length).trim();
+    const userInput = commandArgs(text, "translate");
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
 
@@ -18,7 +19,7 @@ export const translateCommand: CommandModule = {
     if (!userInput && !originalText) {
       try {
         await message.reply({
-          message: "Нужно либо ответить на сообщение с указанием языка (например: !translate ru), либо написать текст после !translate (например: !translate apple).",
+          message: `Нужно либо ответить на сообщение с указанием языка (например: ${commandText("translate")} ru), либо написать текст после ${commandText("translate")} (например: ${commandText("translate")} apple).`,
         });
       } catch (replyErr) {
         console.error("[translate] failed to send input validation reply:", replyErr);

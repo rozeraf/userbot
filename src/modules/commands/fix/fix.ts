@@ -1,12 +1,13 @@
 import { buildPrompt } from "../../../core/llm/prompt";
 import type { CommandModule } from "../types";
+import { commandArgs, commandText, matchesCommand } from "../../../config/commands";
 import { executeLlmReply } from "../llmReply";
 
 export const fixCommand: CommandModule = {
   name: "fix",
-  match: (text) => text === "!fix" || text.startsWith("!fix "),
+  match: (text) => matchesCommand(text, "fix"),
   async run({ client, message, text, correlationId, provider }) {
-    const userPrompt = text.slice("!fix".length).trim();
+    const userPrompt = commandArgs(text, "fix");
     const replied = await message.getReplyMessage();
     const originalText = replied?.text?.trim?.() ?? "";
 
@@ -19,7 +20,7 @@ export const fixCommand: CommandModule = {
     if (!userPrompt && !originalText) {
       try {
         await message.reply({
-          message: "Нужно либо ответить на сообщение с ошибками с помощью !fix, либо написать текст после !fix.",
+          message: `Нужно либо ответить на сообщение с ошибками с помощью ${commandText("fix")}, либо написать текст после ${commandText("fix")}.`,
         });
       } catch (replyErr) {
         console.error("[fix] failed to send input validation reply:", replyErr);

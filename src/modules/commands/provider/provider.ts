@@ -2,13 +2,14 @@ import { ENV, hasKeysFor } from "../../../config/env";
 import type { Provider } from "../../../config/env";
 import { state } from "../../../core/state";
 import type { CommandModule } from "../types";
+import { commandText } from "../../../config/commands";
 import { database } from "../../../core/db";
 
 export const providerCommand: CommandModule = {
   name: "provider",
-  match: (text) => text === "!gemini" || text === "!cerebras",
+  match: (text) => text === commandText("gemini") || text === commandText("cerebras"),
   async run({ message, text }) {
-    const provider: Provider = text === "!gemini" ? "gemini" : "cerebras";
+    const provider: Provider = text === commandText("gemini") ? "gemini" : "cerebras";
     const config = provider === "gemini"
       ? { envName: "GEMINI_API_KEYS", label: "Gemini" }
       : { envName: "CEREBRAS_API_KEYS", label: "Cerebras" };
