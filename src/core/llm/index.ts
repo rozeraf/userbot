@@ -1,10 +1,12 @@
 import { ENV, type Provider } from "../../config/env";
 import { state } from "../state";
-import { askCerebras } from "./cerebras";
-import { askGemini } from "./gemini";
+import { completeCerebras } from "./cerebras";
+import { completeGemini } from "./gemini";
 import { database } from "../db";
 import { errorMessage } from "../errors";
 import { limitGraphemes } from "./prompt";
+import type { CompletionRequest, CompletionResult } from "./types";
+export type { CompletionRequest, CompletionResult, ConversationItem, ToolCall, ToolDefinition } from "./types";
 
 export type LlmRequestContext = {
   correlationId?: string;
@@ -23,13 +25,27 @@ export async function askByProvider(
   systemPrompt?: string,
   context: LlmRequestContext = {},
 ): Promise<string> {
-  console.log("[llm] activeProvider:", provider);
   prompt = limitGraphemes(prompt, ENV.MAX_LLM_PROMPT_GRAPHEMES);
+  const result = await completeTurn(provider, {
+    history: [{ type: "user", text: prompt }],
+    systemPrompt,
+  }, context);
+  if (result.kind !== "text") throw new Error("LLM unexpectedly returned tool calls without tools");
+  return result.text;
+}
+
+export async function completeTurn(
+  provider: Provider,
+  request: CompletionRequest,
+  context: LlmRequestContext = {},
+): Promise<CompletionResult> {
+  console.log("[llm] activeProvider:", provider);
+  const prompt = JSON.stringify(request.history);
   const t0 = Date.now();
   try {
     const response = provider === "cerebras"
-      ? await askCerebras(prompt, systemPrompt)
-      : await askGemini(prompt, systemPrompt);
+      ? await completeCerebras(request)
+      : await completeGemini(request);
 
     const latencyMs = Date.now() - t0;
     database.logLLMCall({
@@ -37,7 +53,7 @@ export async function askByProvider(
       model: modelFor(provider),
       ...context,
       prompt,
-      response,
+      response: response.kind === "text" ? response.text : JSON.stringify(response.calls),
       latencyMs,
       error: null
     });

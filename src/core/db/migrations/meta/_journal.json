@@ -57,6 +57,13 @@
       "when": 1786111947291,
       "tag": "0007_tui_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786370400000,
+      "tag": "0008_message_search",
+      "breakpoints": true
     }
   ]
 }

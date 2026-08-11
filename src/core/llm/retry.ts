@@ -1,4 +1,4 @@
-const TOTAL_TIMEOUT_MS = 45_000;
+export const DEFAULT_LLM_TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 3;
 
 export class HttpError extends Error {
@@ -28,11 +28,13 @@ export async function withLlmRetries<T>(
   provider: string,
   keys: readonly string[],
   request: (apiKey: string, signal: AbortSignal) => Promise<T>,
+  options: { timeoutMs?: number } = {},
 ): Promise<T> {
   if (keys.length === 0) throw new Error(`No ${provider} API keys configured`);
   const keyOrder = shuffled(keys);
   const attempts = MAX_ATTEMPTS;
-  const deadline = Date.now() + TOTAL_TIMEOUT_MS;
+  const timeoutMs = Math.max(1, options.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS);
+  const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -54,7 +56,7 @@ export async function withLlmRetries<T>(
   }
 
   if (lastError instanceof Error && lastError.name === "AbortError") {
-    throw new Error(`${provider} API request timed out (${TOTAL_TIMEOUT_MS / 1000}s total)`);
+    throw new Error(`${provider} API request timed out (${timeoutMs / 1000}s total)`);
   }
   throw lastError ?? new Error(`${provider} API request deadline exceeded`);
 }
