@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, index, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, blob, index, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const messages = sqliteTable(
   "messages",
@@ -131,6 +131,19 @@ export const tuiRevisions = sqliteTable(
     revision: integer("revision").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.resource, t.scope] })],
+);
+
+export const messageEmbeddings = sqliteTable(
+  "message_embeddings",
+  {
+    messageDbId: integer("message_db_id").primaryKey().references(() => messages.id, { onDelete: "cascade" }),
+    model: text("model").notNull(),
+    dimensions: integer("dimensions").notNull(),
+    contentHash: text("content_hash").notNull(),
+    vector: blob("vector", { mode: "buffer" }).notNull(),
+    embeddedAt: integer("embedded_at").notNull(),
+  },
+  (t) => [index("idx_message_embeddings_model").on(t.model)],
 );
 
 // Infer insert types directly from schema — no manual interfaces needed

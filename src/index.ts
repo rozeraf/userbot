@@ -9,13 +9,17 @@ import { database } from "./core/db";
 import { startTuiSyncServer, type TuiSyncServer } from "./core/tuiSync/server";
 import { createWorkspaceSystemNotifier, initializeWorkspace, type WorkspaceRouter } from "./core/workspace";
 import { BRAND } from "./config/branding";
+import { startSemanticIndexer } from "./core/analysis/embeddings/store";
 
 let isShuttingDown = false;
 let tuiSyncServer: TuiSyncServer | null = null;
+let stopSemanticIndexer: (() => void) | null = null;
 
 function shutdown(exitCode = 0) {
   if (isShuttingDown) return;
   isShuttingDown = true;
+  stopSemanticIndexer?.();
+  stopSemanticIndexer = null;
   database.setStatus("disconnected");
   database.close();
   tuiSyncServer?.close();
@@ -55,6 +59,7 @@ process.on("uncaughtException", (error) => {
 
 async function main() {
   database.start();
+  stopSemanticIndexer = startSemanticIndexer();
   tuiSyncServer = await startTuiSyncServer();
   database.setStatus("connecting");
   database.logEvent({

@@ -1,6 +1,7 @@
 import { HistoryRepository } from "../history/repository";
 import type { AnalysisTool } from "./types";
 import { IdentityResolver } from "../history/identity";
+import { hybridSearch } from "../history/hybrid";
 
 const history = new HistoryRepository();
 
@@ -35,7 +36,7 @@ export function createSearchMessagesTool(identityAliases: IdentityAliases = new 
       },
     },
   },
-  execute(argumentsValue) {
+  async execute(argumentsValue) {
     if (!argumentsValue || typeof argumentsValue !== "object") throw new Error("search_messages arguments must be an object");
     const args = argumentsValue as Record<string, unknown>;
     const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -66,7 +67,7 @@ export function createSearchMessagesTool(identityAliases: IdentityAliases = new 
     const chatId = resolvedChat?.id ?? activeChatId;
 
     if (senderId && contentQuery) {
-      const matches = history.messagesBySender(senderId, contentQuery, Math.min(12, limit), chatId);
+      const matches = await hybridSearch({ query: contentQuery, senderId, chatId, limit: Math.min(12, limit) });
       const recentByAuthor = history.messagesBySender(senderId, "", Math.min(8, limit), chatId)
         .filter((item) => !matches.some((match) => match.dbMessageId === item.dbMessageId));
       const evidence = [...matches, ...recentByAuthor];
@@ -84,7 +85,7 @@ export function createSearchMessagesTool(identityAliases: IdentityAliases = new 
     }
     const matches = senderId
       ? history.messagesBySender(senderId, "", limit, chatId)
-      : history.searchMessages(query || sender || chat, limit, chatId);
+      : await hybridSearch({ query: query || sender || chat, chatId, limit });
     return {
       result: {
         resolvedFilters: {

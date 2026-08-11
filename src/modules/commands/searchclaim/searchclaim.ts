@@ -33,7 +33,7 @@ export const searchClaimCommand: CommandModule = {
     }
 
     const aliases = await resolveMentionedUsers(client, claim);
-    const bundle = retrieveClaimEvidence(claim, aliases);
+    const bundle = await retrieveClaimEvidence(claim, aliases);
     const evidenceIds = [...bundle.lexicalMatches, ...bundle.recentBySubject]
       .map((item) => item.dbMessageId);
     database.logEvent({

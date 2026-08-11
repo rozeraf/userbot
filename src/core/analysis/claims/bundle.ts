@@ -3,6 +3,7 @@ import { HistoryRepository } from "../history/repository";
 import { IdentityResolver } from "../history/identity";
 import { claimSearchQuery } from "./query";
 import { normalizeIdentity } from "../history/normalization";
+import { hybridSearch } from "../history/hybrid";
 
 export type ClaimEvidenceBundle = Readonly<{
   claim: string;
@@ -16,7 +17,7 @@ export type ClaimEvidenceBundle = Readonly<{
 const history = new HistoryRepository();
 const identities = new IdentityResolver();
 
-export function retrieveClaimEvidence(claim: string, aliases: ReadonlyMap<string, string>): ClaimEvidenceBundle {
+export async function retrieveClaimEvidence(claim: string, aliases: ReadonlyMap<string, string>): Promise<ClaimEvidenceBundle> {
   const usernameEntry = aliases.entries().next().value as [string, string] | undefined;
   const localSubject = usernameEntry ? null : identities.findSenderInText(claim);
   const subject = usernameEntry
@@ -28,9 +29,12 @@ export function retrieveClaimEvidence(claim: string, aliases: ReadonlyMap<string
 
   const lexicalQueries = [retrievalQuery, ...retrievalQuery.split(/\s+/).reverse()]
     .filter((query, index, all) => query && all.indexOf(query) === index);
-  const lexicalMatches = lexicalQueries.flatMap((query) => subject
-    ? history.messagesBySender(subject.senderId, query, 12, chat?.chatId)
-    : history.searchMessages(query, 12, chat?.chatId))
+  const lexicalMatches = (await Promise.all(lexicalQueries.map((query) => hybridSearch({
+    query,
+    senderId: subject?.senderId,
+    chatId: chat?.chatId,
+    limit: 12,
+  })))).flat()
     .filter((item, index, all) => all.findIndex((other) => other.dbMessageId === item.dbMessageId) === index)
     .slice(0, 12);
   const recentBySubject = subject

@@ -26,6 +26,14 @@ function nonNegativeInteger(name: string, fallback: number): number {
   return value;
 }
 
+function booleanFlag(name: string, fallback = false): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  throw new Error(`Invalid ${name}: "${raw}" must be a boolean flag`);
+}
+
 const rawProvider = (process.env.LLM_PROVIDER ?? "gemini").trim().toLowerCase();
 if (rawProvider !== "gemini" && rawProvider !== "cerebras") {
   throw new Error(`Invalid LLM_PROVIDER: "${rawProvider}" must be gemini or cerebras`);
@@ -63,6 +71,9 @@ export const ENV = {
   MAX_LLM_PROMPT_GRAPHEMES: nonNegativeInteger("MAX_LLM_PROMPT_GRAPHEMES", 30_000),
   /** 0 keeps history forever; a positive value deletes older private logs. */
   DB_RETENTION_DAYS: nonNegativeInteger("DB_RETENTION_DAYS", 0),
+  SEMANTIC_SEARCH_ENABLED: booleanFlag("SEMANTIC_SEARCH_ENABLED"),
+  GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001",
+  EMBEDDING_DIMENSIONS: nonNegativeInteger("EMBEDDING_DIMENSIONS", 768) || 768,
 
   LLM_PROVIDER: provider,
 } as const satisfies {
@@ -76,6 +87,9 @@ export const ENV = {
   SYSTEM_PROMPT: string;
   MAX_LLM_PROMPT_GRAPHEMES: number;
   DB_RETENTION_DAYS: number;
+  SEMANTIC_SEARCH_ENABLED: boolean;
+  GEMINI_EMBEDDING_MODEL: string;
+  EMBEDDING_DIMENSIONS: number;
   LLM_PROVIDER: Provider;
 };
 

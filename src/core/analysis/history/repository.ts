@@ -1,6 +1,8 @@
 import { sqlite } from "../../db/client";
 import type { MessageEvidence } from "../evidence/types";
 import { toFtsQuery } from "./search";
+import { ENV } from "../../../config/env";
+import { bufferToVector, cosineSimilarity } from "../embeddings/vector";
 
 type SearchRow = {
   id: number;
@@ -14,6 +16,7 @@ type SearchRow = {
   timestamp: number;
   text: string;
 };
+type SemanticRow = SearchRow & { vector: Uint8Array };
 
 // Runtime analysis repository. It uses the bot's canonical database connection
 // for read-only queries. TUI database adapters must never be imported here.
@@ -104,5 +107,49 @@ export class HistoryRepository {
       timestamp: row.telegram_timestamp ?? row.timestamp,
       text: row.text,
     }));
+  }
+
+  semanticSearch(queryVector: Float32Array, options: {
+    senderId?: string;
+    chatId?: string;
+    limit?: number;
+    minScore?: number;
+  } = {}): Array<{ evidence: MessageEvidence; score: number }> {
+    const limit = Math.max(1, Math.min(50, Math.trunc(options.limit ?? 10)));
+    const base = `SELECT m.id, m.message_id, m.chat_id, m.sender_id, m.sender_name, m.sender_username,
+      m.chat_title, m.telegram_timestamp, m.timestamp, m.text, e.vector
+      FROM message_embeddings AS e JOIN messages AS m ON m.id = e.message_db_id`;
+    let rows: SemanticRow[];
+    if (options.senderId && options.chatId) {
+      rows = sqlite.query<SemanticRow, [string, number, string, string]>(`${base}
+        WHERE e.model = ? AND e.dimensions = ? AND m.sender_id = ? AND m.chat_id = ?`)
+        .all(ENV.GEMINI_EMBEDDING_MODEL, queryVector.length, options.senderId, options.chatId);
+    } else if (options.senderId) {
+      rows = sqlite.query<SemanticRow, [string, number, string]>(`${base}
+        WHERE e.model = ? AND e.dimensions = ? AND m.sender_id = ?`)
+        .all(ENV.GEMINI_EMBEDDING_MODEL, queryVector.length, options.senderId);
+    } else if (options.chatId) {
+      rows = sqlite.query<SemanticRow, [string, number, string]>(`${base}
+        WHERE e.model = ? AND e.dimensions = ? AND m.chat_id = ?`)
+        .all(ENV.GEMINI_EMBEDDING_MODEL, queryVector.length, options.chatId);
+    } else {
+      rows = sqlite.query<SemanticRow, [string, number]>(`${base}
+        WHERE e.model = ? AND e.dimensions = ?`)
+        .all(ENV.GEMINI_EMBEDDING_MODEL, queryVector.length);
+    }
+    return rows.map((row) => ({
+      evidence: {
+        dbMessageId: row.id,
+        telegram: { chatId: row.chat_id, messageId: row.message_id },
+        author: { senderId: row.sender_id, displayName: row.sender_name, username: row.sender_username },
+        chat: { title: row.chat_title },
+        timestamp: row.telegram_timestamp ?? row.timestamp,
+        text: row.text,
+      },
+      score: cosineSimilarity(queryVector, bufferToVector(row.vector)),
+    }))
+      .filter((item) => item.score >= (options.minScore ?? 0.45))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
   }
 }
