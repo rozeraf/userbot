@@ -88,7 +88,16 @@ export async function runToolConversation(options: {
           database.logEvent({
             eventType: "analysis_tool_success", level: "info", category: "llm",
             message: `Tool ${call.name} succeeded in ${Date.now() - startedAt}ms`,
-            metadata: { correlationId: options.context?.correlationId, callId: call.callId },
+            metadata: {
+              correlationId: options.context?.correlationId,
+              provider: options.provider,
+              tool: call.name,
+              callId: call.callId,
+              args: call.arguments,
+              evidenceCount: execution.evidence?.length ?? 0,
+              evidenceIds: execution.evidence?.map((item) => item.dbMessageId) ?? [],
+              latencyMs: Date.now() - startedAt,
+            },
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -96,7 +105,14 @@ export async function runToolConversation(options: {
           database.logEvent({
             eventType: "analysis_tool_error", level: "warn", category: "llm",
             message: `Tool ${call.name} failed: ${message}`,
-            metadata: { correlationId: options.context?.correlationId, callId: call.callId },
+            metadata: {
+              correlationId: options.context?.correlationId,
+              provider: options.provider,
+              tool: call.name,
+              callId: call.callId,
+              args: call.arguments,
+              latencyMs: Date.now() - startedAt,
+            },
           });
         }
       }

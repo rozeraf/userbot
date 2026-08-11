@@ -18,9 +18,9 @@ async function removeStaleSocket(socketPath: string): Promise<void> {
       socket: { data() {}, open(socket) { socket.end(); } },
     });
     socket.end();
-    throw new Error(`Another tg-userbot instance is already listening on ${socketPath}`);
+    throw new Error(`Another Jarvis Userbot instance is already listening on ${socketPath}`);
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith("Another tg-userbot")) throw err;
+    if (err instanceof Error && err.message.startsWith("Another Jarvis Userbot")) throw err;
     const code = err instanceof Error && "code" in err ? err.code : undefined;
     if (code !== "ECONNREFUSED" && code !== "ENOENT") throw err;
     try { fs.unlinkSync(socketPath); } catch (unlinkErr) {

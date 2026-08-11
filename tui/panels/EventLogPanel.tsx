@@ -64,7 +64,7 @@ function levelColor(level: EventLevel): string {
 /** Serialise one entry to a human-readable debug block */
 function entryToText(e: LogEntry): string {
   const lines = [
-    `╔════ USERBOT DEBUG ════════════════════════════════`,
+    `╔════ JARVIS USERBOT DEBUG ═════════════════════════`,
     `║  ID        : ${e.id}`,
     `║  Timestamp : ${formatDateTime(e.timestamp)}`,
     `║  Category  : ${e.category}`,
@@ -87,7 +87,7 @@ function entryToText(e: LogEntry): string {
 /** Write entries to /tmp file, return the path */
 function exportToFile(entries: LogEntry[]): string {
   const ts   = new Date().toISOString().replace(/[:.]/g, "-");
-  const path = `/tmp/userbot-debug-${ts}.txt`;
+  const path = `/tmp/jarvis-userbot-debug-${ts}.txt`;
   const body = [
     `# Userbot Debug Export — ${new Date().toISOString()}`,
     `# Entries: ${entries.length}`,

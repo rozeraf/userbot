@@ -1,7 +1,7 @@
 {
-  "name": "tg-userbot",
+  "name": "jarvis-userbot",
   "version": "1.0.0",
-  "description": "Telegram userbot with LLM commands, SQLite logging, and a read-only TUI",
+  "description": "Jarvis Userbot with LLM commands, local history analysis, and a read-only TUI",
   "type": "module",
   "engines": {
     "bun": ">=1.0.0"

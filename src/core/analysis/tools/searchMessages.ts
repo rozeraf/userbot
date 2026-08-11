@@ -1,5 +1,6 @@
 import { HistoryRepository } from "../history/repository";
 import type { AnalysisTool } from "./types";
+import { IdentityResolver } from "../history/identity";
 
 const history = new HistoryRepository();
 
@@ -9,7 +10,17 @@ function normalizedAlias(value: string): string {
   return value.trim().replace(/^@/, "").toLowerCase();
 }
 
+function modelEvidence(evidence: readonly ReturnType<HistoryRepository["searchMessages"]>[number][]) {
+  return evidence.map((item) => ({
+    ...item,
+    timestamp: new Date(item.timestamp).toISOString(),
+  }));
+}
+
 export function createSearchMessagesTool(identityAliases: IdentityAliases = new Map()): AnalysisTool {
+  const identities = new IdentityResolver();
+  let activeSenderId: string | undefined;
+  let activeChatId: string | undefined;
   return {
   definition: {
     name: "search_messages",
@@ -18,7 +29,8 @@ export function createSearchMessagesTool(identityAliases: IdentityAliases = new 
       type: "object",
       properties: {
         query: { type: "string", description: "Optional literal content keywords. Leave empty when only looking for an author's latest messages." },
-        sender: { type: "string", description: "Optional @username whose own messages must be searched" },
+        sender: { type: "string", description: "Optional @username or display name whose own messages must be searched. Keep using it for every author-specific search." },
+        chat: { type: "string", description: "Optional chat title whose messages must be searched. Keep using it for every chat-specific search." },
         limit: { type: "integer", minimum: 1, maximum: 20 },
       },
     },
@@ -28,17 +40,62 @@ export function createSearchMessagesTool(identityAliases: IdentityAliases = new 
     const args = argumentsValue as Record<string, unknown>;
     const query = typeof args.query === "string" ? args.query.trim() : "";
     const sender = typeof args.sender === "string" ? args.sender : "";
-    if (!query && !sender) throw new Error("search_messages requires query or sender");
-    const limit = typeof args.limit === "number" ? args.limit : 8;
+    const chat = typeof args.chat === "string" ? args.chat.trim() : "";
+    if (!query && !sender && !chat) throw new Error("search_messages requires query, sender, or chat");
+    const limit = typeof args.limit === "number" ? Math.max(1, Math.min(20, Math.trunc(args.limit))) : 20;
     const queryTerms = query.split(/\s+/);
     const aliasFromQuery = queryTerms.find((term) => identityAliases.has(normalizedAlias(term)));
     const alias = normalizedAlias(sender || aliasFromQuery || "");
-    const senderId = identityAliases.get(alias);
-    const contentQuery = aliasFromQuery ? queryTerms.filter((term) => term !== aliasFromQuery).join(" ") : query;
-    const evidence = senderId
-      ? history.messagesBySender(senderId, contentQuery, limit)
-      : history.searchMessages(query || sender, limit);
-    return { result: evidence, evidence };
+    let senderId = identityAliases.get(alias);
+    let contentQuery = aliasFromQuery ? queryTerms.filter((term) => term !== aliasFromQuery).join(" ") : query;
+    if (!senderId && sender) {
+      const candidates = identities.resolve(sender, 5).filter((candidate) => candidate.kind === "sender");
+      if (candidates.length === 1) senderId = candidates[0]!.id;
+    }
+    if (!senderId && !sender && queryTerms.length === 1) {
+      const candidates = identities.resolve(query, 5).filter((candidate) => candidate.kind === "sender");
+      if (candidates.length === 1) {
+        senderId = candidates[0]!.id;
+        contentQuery = "";
+      }
+    }
+    if (senderId) activeSenderId = senderId;
+    senderId ??= activeSenderId;
+    const resolvedChat = chat ? identities.findChatInText(chat) : null;
+    if (resolvedChat) activeChatId = resolvedChat.id;
+    const chatId = resolvedChat?.id ?? activeChatId;
+
+    if (senderId && contentQuery) {
+      const matches = history.messagesBySender(senderId, contentQuery, Math.min(12, limit), chatId);
+      const recentByAuthor = history.messagesBySender(senderId, "", Math.min(8, limit), chatId)
+        .filter((item) => !matches.some((match) => match.dbMessageId === item.dbMessageId));
+      const evidence = [...matches, ...recentByAuthor];
+      return {
+        result: {
+          resolvedFilters: {
+            sender: senderId ? { requested: sender || aliasFromQuery || null, senderId } : null,
+            chat: chatId ? { requested: chat || null, chatId } : null,
+          },
+          matches: modelEvidence(matches),
+          recentByAuthor: modelEvidence(recentByAuthor),
+        },
+        evidence,
+      };
+    }
+    const matches = senderId
+      ? history.messagesBySender(senderId, "", limit, chatId)
+      : history.searchMessages(query || sender || chat, limit, chatId);
+    return {
+      result: {
+        resolvedFilters: {
+          sender: senderId ? { requested: sender || aliasFromQuery || null, senderId } : null,
+          chat: chatId ? { requested: chat || null, chatId } : null,
+        },
+        matches: modelEvidence(matches),
+        recentByAuthor: [],
+      },
+      evidence: matches,
+    };
   },
   };
 }

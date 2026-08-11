@@ -8,6 +8,7 @@ import { onNewMessage } from "./modules/events/onNewMessage";
 import { database } from "./core/db";
 import { startTuiSyncServer, type TuiSyncServer } from "./core/tuiSync/server";
 import { createWorkspaceSystemNotifier, initializeWorkspace, type WorkspaceRouter } from "./core/workspace";
+import { BRAND } from "./config/branding";
 
 let isShuttingDown = false;
 let tuiSyncServer: TuiSyncServer | null = null;
@@ -60,7 +61,7 @@ async function main() {
     eventType: "bot_start",
     level: "info",
     category: "system",
-    message: "Starting tg-userbot",
+    message: `Starting ${BRAND.name}`,
     metadata: { hasSession: Boolean(ENV.TG_SESSION) },
   });
   const session = new StringSession(ENV.TG_SESSION);
@@ -123,13 +124,13 @@ async function main() {
     console.warn("[tg] failed to ping Telegram", e);
   }
 
-  console.log("Юзербот запущен.");
+  console.log(`${BRAND.name} запущен.`);
   console.log("[tg] initial provider:", ENV.LLM_PROVIDER);
   database.logEvent({
     eventType: "bot_ready",
     level: "info",
     category: "system",
-    message: "Userbot is running and listening for messages",
+    message: `${BRAND.name} is running and listening for messages`,
     metadata: { initialProvider: ENV.LLM_PROVIDER },
   });
 
@@ -138,13 +139,13 @@ async function main() {
     workspace = await initializeWorkspace(client);
     const systemNotifier = createWorkspaceSystemNotifier(client, workspace);
     database.setSystemEventSink((event) => systemNotifier.notifyEvent(event));
-    void systemNotifier.notify("✅ tg-userbot workspace ready").catch(() => {});
+    void systemNotifier.notify(`✅ ${BRAND.name} workspace ready`).catch(() => {});
     console.log("[workspace] ready:", workspace.config.chatId, workspace.config.topics);
     database.logEvent({
       eventType: "workspace_ready",
       level: "info",
       category: "system",
-      message: "Userbot Workspace initialized",
+      message: `${BRAND.workspaceTitle} initialized`,
       metadata: { chatId: workspace.config.chatId, topics: workspace.config.topics },
     });
   } catch (err) {

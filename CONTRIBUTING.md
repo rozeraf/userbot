@@ -1,4 +1,4 @@
-# Разработка tg-userbot
+# Разработка Jarvis Userbot
 
 ## Рабочий цикл
 

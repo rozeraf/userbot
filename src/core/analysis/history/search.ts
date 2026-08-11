@@ -4,6 +4,6 @@ const MAX_QUERY_TERMS = 12;
 export function toFtsQuery(input: string): string {
   return (input.normalize("NFKC").match(/[\p{L}\p{N}_-]+/gu) ?? [])
     .slice(0, MAX_QUERY_TERMS)
-    .map((term) => `"${term.replaceAll('"', '""')}"`)
+    .map((term) => `"${term.replaceAll('"', '""')}"${term.length >= 4 ? "*" : ""}`)
     .join(" AND ");
 }

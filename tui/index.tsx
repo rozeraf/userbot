@@ -10,6 +10,7 @@ import { CommandQueuePanel } from "./panels/CommandQueuePanel";
 import { MessagesPanel }     from "./panels/MessagesPanel";
 import { LlmCallsPanel }     from "./panels/LlmCallsPanel";
 import { WaitingScreen }     from "./panels/WaitingScreen";
+import { BRAND } from "../src/config/branding";
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
@@ -224,7 +225,7 @@ function TuiApp() {
       <Box justifyContent="space-between" paddingX={1}
            borderStyle="single" borderColor="cyan"
            borderTop={false} borderLeft={false} borderRight={false}>
-        <Text bold color="cyan">⚡ TG-USERBOT</Text>
+        <Text bold color="cyan">⚡ {BRAND.name.toUpperCase()}</Text>
         <Text color="gray">
           <Text bold color={headerStatusColor}>{isStale ? "DISCONNECTED" : data.status.toUpperCase()}</Text>
           {" · "}

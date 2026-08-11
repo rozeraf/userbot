@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "userbot",
+      "name": "jarvis-userbot",
       "dependencies": {
         "big-integer": "^1.6.52",
         "drizzle-orm": "^0.45.2",

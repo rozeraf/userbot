@@ -45,7 +45,7 @@
 
 ## Готово
 
-- [x] Приватный forum `Userbot Workspace`: idempotent `Chat/Saved/Media/Settings/System`, routing по сохранённым ID, plain-text LLM chat, тихие хранилища, System notifications и recovery tests.
+- [x] Приватный forum `Jarvis Workspace`: idempotent `Chat/Saved/Media/Settings/System`, routing по сохранённым ID, plain-text LLM chat, тихие хранилища, System notifications и recovery tests.
 - [x] Native `.remind`: scheduled message в «Избранном», диапазон 10 секунд–365 дней, единицы `s/с`, `m/м`, `h/ч`, `d/д`.
 - [x] Durable command execution и восстановление прерванных команд.
 - [x] Scoped TUI revisions, coalesced UDS wakeups и `data_version` watchdog.

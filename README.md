@@ -1,10 +1,10 @@
-# tg-userbot
+# Jarvis Userbot
 
-Telegram userbot, работающий под твоим личным аккаунтом через MTProto (GramJS). Пишешь команду в любой чат — бот отвечает от твоего имени через LLM.
+Jarvis — Telegram-юзербот, работающий под твоим личным аккаунтом через MTProto (GramJS). Пишешь команду в любой чат — Jarvis отвечает от твоего имени через LLM.
 
 Поддерживает **Gemini** (Google) и **Cerebras** как провайдеры; переключаются на лету командой прямо в Telegram. Весь трафик (сообщения, вызовы LLM, события) логируется в локальную SQLite-базу через [Drizzle ORM](https://orm.drizzle.team/).
 
-Документы проекта: [правила разработки](CONTRIBUTING.md), [roadmap](todo.md), [Userbot Workspace](docs/workspace.md), [синхронизация TUI](docs/tui-sync.md).
+Документы проекта: [правила разработки](CONTRIBUTING.md), [roadmap](todo.md), [Jarvis Workspace](docs/workspace.md), [синхронизация TUI](docs/tui-sync.md).
 
 ## Быстрый старт
 
@@ -42,7 +42,7 @@ bun run tui
 > Бот реагирует **только на твои собственные сообщения** (`message.out`). На чужие команды не реагирует.
 
 После первого авторизованного запуска бот также создаёт приватный forum
-`Userbot Workspace`. В его топике `Chat` можно писать без command prefix;
+`Jarvis Workspace`. В его топике `Chat` можно писать без command prefix;
 `Saved` и `Media` работают как тихие хранилища, `Settings` принимает явные
 `.commands`, а `System` — ошибки и служебные уведомления. Подробности — в
 [docs/workspace.md](docs/workspace.md).

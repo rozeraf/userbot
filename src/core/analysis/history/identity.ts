@@ -1,4 +1,5 @@
 import { sqlite } from "../../db/client";
+import { normalizeIdentity } from "./normalization";
 
 export type IdentityCandidate = Readonly<{
   kind: "sender" | "chat";
@@ -27,5 +28,38 @@ export class IdentityResolver {
       ORDER BY messageCount DESC
       LIMIT ?
     `).all(pattern, pattern, pattern, safeLimit);
+  }
+
+  findSenderInText(input: string): IdentityCandidate | null {
+    const haystack = ` ${normalizeIdentity(input)} `;
+    const rows = sqlite.query<IdentityCandidate, []>(`
+      SELECT 'sender' AS kind, sender_id AS id,
+             COALESCE(MAX(sender_name), MAX(sender_username), sender_id) AS displayName,
+             COUNT(*) AS messageCount
+      FROM messages WHERE sender_id IS NOT NULL GROUP BY sender_id
+    `).all();
+    return rows
+      .filter((row) => {
+        const name = normalizeIdentity(row.displayName);
+        return name.length >= 3 && haystack.includes(` ${name} `);
+      })
+      .sort((a, b) => normalizeIdentity(b.displayName).length - normalizeIdentity(a.displayName).length
+        || b.messageCount - a.messageCount)[0] ?? null;
+  }
+
+  findChatInText(input: string): IdentityCandidate | null {
+    const haystack = ` ${normalizeIdentity(input)} `;
+    const rows = sqlite.query<IdentityCandidate, []>(`
+      SELECT 'chat' AS kind, chat_id AS id, COALESCE(MAX(chat_title), chat_id) AS displayName,
+             COUNT(*) AS messageCount
+      FROM messages WHERE chat_id IS NOT NULL GROUP BY chat_id
+    `).all();
+    return rows
+      .filter((row) => {
+        const name = normalizeIdentity(row.displayName);
+        return name.length >= 3 && haystack.includes(` ${name} `);
+      })
+      .sort((a, b) => normalizeIdentity(b.displayName).length - normalizeIdentity(a.displayName).length
+        || b.messageCount - a.messageCount)[0] ?? null;
   }
 }

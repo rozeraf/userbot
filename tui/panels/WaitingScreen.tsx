@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { dbError } from "../core/db";
+import { BRAND } from "../../src/config/branding";
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -28,7 +29,7 @@ export function WaitingScreen({ width, height }: Props) {
     <Box width={width} height={height} flexDirection="column"
          alignItems="center" justifyContent="center">
       <Box flexDirection="column" alignItems="center">
-        <Text bold color="cyan">⚡ TG-USERBOT TUI</Text>
+        <Text bold color="cyan">⚡ {BRAND.name.toUpperCase()} TUI</Text>
         <Box marginTop={1}>
           <Text color="yellow">{spinner} </Text>
           <Text color="gray">Waiting for bot database…</Text>

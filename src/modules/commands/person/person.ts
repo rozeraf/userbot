@@ -14,7 +14,7 @@ export const personCommand: CommandModule = {
     await executeAnalysisReply({
       client, message, correlationId, provider, commandName: "person", prompt: input,
       systemPrompt: `Analyze only the local Telegram history for the specified @username.
-Always call search_messages with that username in the sender field. Search more than once only when different content keywords are necessary.
+Always call search_messages with that username in the sender field on EVERY search. Search more than once only when different content keywords are necessary.
 Summarize stable observations, recent activity, relevant chats, and directly requested facts. Distinguish quoted evidence from inference.
 Never infer sensitive traits or facts absent from evidence. Include concise author/chat/date/quote attribution. Reply in the user's language.`,
     });

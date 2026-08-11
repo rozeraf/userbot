@@ -57,7 +57,7 @@ function preview(text: string, maxLen = 55): string {
 
 function entryToText(e: LlmRow): string {
   const lines = [
-    `╔════ USERBOT LLM DEBUG ════════════════════════════`,
+    `╔════ JARVIS USERBOT LLM DEBUG ═════════════════════`,
     `║  ID        : ${e.id}`,
     `║  Timestamp : ${new Date(e.timestamp).toISOString().replace("T", " ").replace("Z", " UTC")}`,
     `║  Provider  : ${e.provider}`,
@@ -80,7 +80,7 @@ function entryToText(e: LlmRow): string {
 
 function exportToFile(entries: LlmRow[]): string {
   const ts   = new Date().toISOString().replace(/[:.]/g, "-");
-  const path = `/tmp/userbot-debug-${ts}.txt`;
+  const path = `/tmp/jarvis-userbot-debug-${ts}.txt`;
   const body = [
     `# Userbot LLM Debug Export — ${new Date().toISOString()}`,
     `# Entries: ${entries.length}`,

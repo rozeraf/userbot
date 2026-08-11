@@ -4,8 +4,9 @@ import { Api, utils, type TelegramClient } from "telegram";
 import { createWorkspaceRouter } from "./router";
 import type { WorkspaceConfig, WorkspaceRole, WorkspaceRouter } from "./types";
 import { workspaceInputChannel } from "./peer";
+import { BRAND } from "../../config/branding";
 
-const WORKSPACE_TITLE = "Userbot Workspace";
+const WORKSPACE_TITLE = BRAND.workspaceTitle;
 const TOPIC_TITLES: Record<WorkspaceRole, string> = {
   chat: "Chat",
   saved: "Saved",
@@ -53,7 +54,7 @@ function newRandomId(): string {
 async function createWorkspace(client: TelegramClient, persistence: WorkspacePersistence): Promise<WorkspaceConfig> {
   const result = await client.invoke(new Api.channels.CreateChannel({
     title: WORKSPACE_TITLE,
-    about: "Private workspace managed by tg-userbot",
+    about: BRAND.workspaceAbout,
     megagroup: true,
     forum: true,
   }));
@@ -80,6 +81,9 @@ async function ensureForum(client: TelegramClient, config: WorkspaceConfig): Pro
   const response = await client.invoke(new Api.channels.GetChannels({ id: [channel] }));
   const entity = response.chats.find((chat): chat is Api.Channel => chat instanceof Api.Channel);
   if (!entity) throw new Error(`Workspace channel ${config.chatId} is unavailable`);
+  if (entity.title !== WORKSPACE_TITLE) {
+    await client.invoke(new Api.channels.EditTitle({ channel, title: WORKSPACE_TITLE }));
+  }
   if (!entity.forum) {
     await client.invoke(new Api.channels.ToggleForum({ channel, enabled: true }));
   }

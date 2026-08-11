@@ -23,6 +23,7 @@ describe("workspace initialization", () => {
       topicRandomIds: { media: "777" },
     };
     let createCalls = 0;
+    const renamedTitles: string[] = [];
     const saved: WorkspaceConfig[] = [];
     const client = {
       async invoke(request: unknown) {
@@ -30,6 +31,10 @@ describe("workspace initialization", () => {
           return new Api.messages.Chats({ chats: [new Api.Channel({
             id: bigInt(123), accessHash: bigInt(456), title: "Userbot Workspace", forum: true,
           } as ConstructorParameters<typeof Api.Channel>[0])] });
+        }
+        if (request instanceof Api.channels.EditTitle) {
+          renamedTitles.push(request.title);
+          return new Api.Updates({ updates: [], users: [], chats: [], date: 0, seq: 0 });
         }
         if (request instanceof Api.channels.GetForumTopicsByID) {
           const id = request.topics[0]!;
@@ -52,6 +57,7 @@ describe("workspace initialization", () => {
     });
 
     expect(createCalls).toBe(1);
+    expect(renamedTitles).toEqual(["Jarvis Workspace"]);
     expect(workspace.config.topics).toEqual({ chat: 1, saved: 4, media: 5, settings: 7, system: 6 });
     expect(saved.at(-1)?.topics.media).toBe(5);
   });
