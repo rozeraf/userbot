@@ -1,11 +1,12 @@
 import type { ToolDefinition } from "../../llm";
-import { searchMessagesTool } from "./searchMessages";
+import { createSearchMessagesTool, type IdentityAliases } from "./searchMessages";
 import type { AnalysisTool, ToolExecution } from "./types";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, AnalysisTool>();
 
-  constructor(tools: readonly AnalysisTool[] = [searchMessagesTool]) {
+  constructor(options: { tools?: readonly AnalysisTool[]; identityAliases?: IdentityAliases } = {}) {
+    const tools = options.tools ?? [createSearchMessagesTool(options.identityAliases)];
     for (const tool of tools) this.tools.set(tool.definition.name, tool);
   }
 

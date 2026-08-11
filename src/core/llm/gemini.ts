@@ -3,6 +3,7 @@ import { combineSystemPrompts, normalizeText } from "./prompt";
 import { errorMessage } from "../errors";
 import { HttpError, withLlmRetries } from "./retry";
 import type { CompletionRequest, CompletionResult, ConversationItem } from "./types";
+import type { ToolCall } from "./types";
 
 interface GeminiResponse {
   candidates?: {
@@ -10,6 +11,7 @@ interface GeminiResponse {
       parts?: {
         text?: string;
         functionCall?: { name: string; args?: unknown };
+        thoughtSignature?: string;
       }[];
     };
   }[];
@@ -20,6 +22,23 @@ interface GeminiResponse {
 
 type GeminiContent = { role: "user" | "model"; parts: Array<Record<string, unknown>> };
 
+function replayMetadata(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object") return {};
+  const thoughtSignature = (value as Record<string, unknown>).thoughtSignature;
+  return typeof thoughtSignature === "string" ? { thoughtSignature } : {};
+}
+
+export function parseGeminiToolCalls(parts: NonNullable<GeminiResponse["candidates"]>[number]["content"] extends infer C
+  ? C extends { parts?: infer P } ? NonNullable<P> : never
+  : never): ToolCall[] {
+  return parts.flatMap((part, index) => part.functionCall ? [{
+    callId: `gemini-${Date.now()}-${index}`,
+    name: part.functionCall.name,
+    arguments: part.functionCall.args ?? {},
+    ...(part.thoughtSignature ? { providerMetadata: { thoughtSignature: part.thoughtSignature } } : {}),
+  }] : []);
+}
+
 export function serializeGeminiHistory(history: readonly ConversationItem[]): GeminiContent[] {
   return history.map((item): GeminiContent => {
     switch (item.type) {
@@ -27,7 +46,10 @@ export function serializeGeminiHistory(history: readonly ConversationItem[]): Ge
       case "assistant_text": return { role: "model", parts: [{ text: item.text }] };
       case "assistant_tool_calls": return {
         role: "model",
-        parts: item.calls.map((call) => ({ functionCall: { name: call.name, args: call.arguments } })),
+        parts: item.calls.map((call) => ({
+          functionCall: { name: call.name, args: call.arguments },
+          ...replayMetadata(call.providerMetadata),
+        })),
       };
       case "tool_result": return {
         role: "user",
@@ -92,11 +114,7 @@ export async function completeGemini(request: CompletionRequest): Promise<Comple
       console.log("[gemini] raw response keys:", Object.keys(data ?? {}));
 
       const parts = data.candidates?.[0]?.content?.parts ?? [];
-      const calls = parts.flatMap((part, index) => part.functionCall ? [{
-        callId: `gemini-${Date.now()}-${index}`,
-        name: part.functionCall.name,
-        arguments: part.functionCall.args ?? {},
-      }] : []);
+      const calls = parseGeminiToolCalls(parts);
       if (calls.length) return { kind: "tool_calls", calls };
       const text = parts.map((part) => part.text ?? "").join("");
       if (!text) throw new Error("Gemini returned empty response");

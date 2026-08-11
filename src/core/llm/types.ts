@@ -2,6 +2,8 @@ export type ToolCall = Readonly<{
   callId: string;
   name: string;
   arguments: unknown;
+  /** Opaque adapter-owned continuation data that must be replayed verbatim. */
+  providerMetadata?: unknown;
 }>;
 
 export type ConversationItem =

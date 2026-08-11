@@ -30,6 +30,10 @@ function resolveEntityName(entity: unknown): string | undefined {
   return undefined;
 }
 
+function resolveEntityUsername(entity: unknown): string | undefined {
+  return entity instanceof Api.User ? (entity.username ?? undefined) : undefined;
+}
+
 // Commands remain ordered within one chat, while a slow LLM call in one chat does
 // not block unrelated chats. Provider changes are applied when their command runs.
 const commandQueues = new Map<string, Promise<void>>();
@@ -76,7 +80,10 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient, wor
     ? Promise.resolve(undefined)
     : message.getChat().then(resolveEntityName).catch(() => undefined);
   const senderPromise = (!isOutgoing && !matchedCmd)
-    ? message.getSender().then(resolveEntityName).catch(() => undefined)
+    ? message.getSender().then((entity) => ({
+        name: resolveEntityName(entity),
+        username: resolveEntityUsername(entity),
+      })).catch(() => undefined)
     : Promise.resolve(undefined);
 
   if (matchedCmd) {
@@ -96,6 +103,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient, wor
         telegramTimestamp: message.date ? message.date * 1000 : null,
         chatTitle: null,
         senderName: null,
+        senderUsername: null,
       });
 
       console.log("[event] executing queued command:", {
@@ -164,7 +172,7 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient, wor
     }
     // Non-command message: log asynchronously as soon as names are resolved, without blocking the queue
     Promise.all([chatPromise, senderPromise])
-      .then(([chatTitle, senderName]) => {
+      .then(([chatTitle, senderIdentity]) => {
         database.logMessage({
           messageId:  message.id,
           chatId,
@@ -173,7 +181,8 @@ export function onNewMessage(event: NewMessageEvent, client: TelegramClient, wor
           isOutgoing,
           telegramTimestamp: message.date ? message.date * 1000 : null,
           chatTitle:  chatTitle ?? null,
-          senderName: senderName ?? null,
+          senderName: senderIdentity?.name ?? null,
+          senderUsername: senderIdentity?.username ?? null,
         });
       })
       .catch((err) => {

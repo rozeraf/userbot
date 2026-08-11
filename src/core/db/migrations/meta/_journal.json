@@ -64,6 +64,13 @@
       "when": 1786370400000,
       "tag": "0008_message_search",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786445000000,
+      "tag": "0009_sender_username",
+      "breakpoints": true
     }
   ]
 }

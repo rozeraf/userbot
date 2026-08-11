@@ -5,9 +5,11 @@ import fix from "./fix/init";
 import find from "./find/init";
 import help from "./help/init";
 import provider from "./provider/init";
+import person from "./person/init";
 import remind from "./remind/init";
 import status from "./status/init";
 import summarize from "./summarize/init";
+import searchclaim from "./searchclaim/init";
 import translate from "./translate/init";
 
 // Explicit ordering makes command matching deterministic and turns a broken
@@ -18,9 +20,11 @@ export const COMMANDS: CommandModule[] = [
   fix,
   find,
   help,
+  person,
   provider,
   remind,
   status,
+  searchclaim,
   summarize,
   translate,
 ];

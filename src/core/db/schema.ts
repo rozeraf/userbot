@@ -13,6 +13,7 @@ export const messages = sqliteTable(
     isOutgoing: integer("is_outgoing", { mode: "boolean" }).notNull(),
     chatTitle:  text("chat_title"),   // denormalized: resolved at log time
     senderName: text("sender_name"),  // denormalized: resolved at log time
+    senderUsername: text("sender_username"),
   },
   (t) => [
     uniqueIndex("uq_messages_chat_message").on(t.chatId, t.messageId),

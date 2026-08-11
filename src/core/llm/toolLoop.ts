@@ -39,10 +39,28 @@ export async function runToolConversation(options: {
   const evidence: MessageEvidence[] = [];
   let toolRounds = 0;
 
+  const finish = (text: string, timedOut: boolean, reason: "text" | "deadline" | "round_limit"): AnalysisResult => {
+    database.logEvent({
+      eventType: "analysis_complete",
+      level: timedOut ? "warn" : "info",
+      category: "llm",
+      message: `Analysis completed: ${reason}; ${toolRounds} tool round(s), ${evidence.length} evidence item(s)`,
+      metadata: {
+        correlationId: options.context?.correlationId,
+        commandName: options.context?.commandName,
+        toolRounds,
+        evidenceCount: evidence.length,
+        timedOut,
+        reason,
+      },
+    });
+    return { text, evidence, diagnostics: { toolRounds, timedOut } };
+  };
+
   try {
     while (true) {
       const remainingMs = deadline - Date.now();
-      if (remainingMs <= 0) return { text: timeoutFallback(evidence), evidence, diagnostics: { toolRounds, timedOut: true } };
+      if (remainingMs <= 0) return finish(timeoutFallback(evidence), true, "deadline");
       const allowTools = toolRounds < maxRounds;
       const result = await completeTurn(options.provider, {
         history,
@@ -52,9 +70,9 @@ export async function runToolConversation(options: {
       }, options.context);
 
       if (result.kind === "text") {
-        return { text: result.text, evidence, diagnostics: { toolRounds, timedOut: false } };
+        return finish(result.text, false, "text");
       }
-      if (!allowTools) return { text: roundLimitFallback(evidence), evidence, diagnostics: { toolRounds, timedOut: false } };
+      if (!allowTools) return finish(roundLimitFallback(evidence), false, "round_limit");
 
       history.push({ type: "assistant_tool_calls", calls: result.calls });
       for (const call of result.calls) {
@@ -86,7 +104,7 @@ export async function runToolConversation(options: {
     }
   } catch (error) {
     if (Date.now() >= deadline || (error instanceof Error && /timed out|deadline/i.test(error.message))) {
-      return { text: timeoutFallback(evidence), evidence, diagnostics: { toolRounds, timedOut: true } };
+      return finish(timeoutFallback(evidence), true, "deadline");
     }
     throw error;
   }

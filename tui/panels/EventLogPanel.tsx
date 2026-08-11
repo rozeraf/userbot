@@ -19,6 +19,10 @@ export interface LogEntry {
   timestamp: number;
 }
 
+function singleLinePreview(message: string): string {
+  return message.replace(/\s+/g, " ").trim();
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MAX_BUFFER     = 1000;
@@ -419,7 +423,7 @@ export function EventLogPanel({ height = 20, isFocused }: Props) {
                   color={isSelected ? "black" : levelColor(entry.level)}
                   wrap="truncate-end"
                 >
-                  {entry.message}
+                  {singleLinePreview(entry.message)}
                 </Text>
               </Box>
             );
