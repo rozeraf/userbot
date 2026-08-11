@@ -60,7 +60,7 @@ export const ENV = {
   TG_API_ID: tgApiId,
   TG_API_HASH: required("TG_API_HASH"),
   TG_SESSION: process.env.TG_SESSION?.trim() ?? "",
-  TG_PING_INTERVAL_SECONDS: nonNegativeInteger("TG_PING_INTERVAL_SECONDS", 180),
+  TG_PING_INTERVAL_SECONDS: nonNegativeInteger("TG_PING_INTERVAL_SECONDS", 0),
 
   GEMINI_API_KEYS: geminiApiKeys,
   GEMINI_MODEL: process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash",
