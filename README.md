@@ -111,6 +111,7 @@ SYSTEM_PROMPT="Отвечай кратко и по существу."
 # Максимальный размер пользовательского промпта в графемах; 0 отключает лимит.
 MAX_LLM_PROMPT_GRAPHEMES=30000
 SEMANTIC_SEARCH_ENABLED=false # opt-in: индексирует приватную историю через Gemini Embeddings
+TG_PING_INTERVAL_SECONDS=180  # 0 отключает активный Telegram health-check
 GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 EMBEDDING_DIMENSIONS=768
 
@@ -341,6 +342,7 @@ SQLite работает в режиме **WAL** с `synchronous = FULL`: зап�
 | `MAX_LLM_PROMPT_GRAPHEMES` | — | `30000` | Максимальная длина пользовательского промпта в графемах; `0` отключает лимит |
 | `DB_RETENTION_DAYS` | — | `0` | Срок хранения локальных журналов в днях; `0` отключает автоматическое удаление |
 | `SEMANTIC_SEARCH_ENABLED` | — | `false` | Включить отправку сообщений в Gemini Embeddings и гибридный semantic+FTS поиск |
+| `TG_PING_INTERVAL_SECONDS` | — | `180` | Интервал активной проверки Telegram; `0` полностью отключает периодический API-вызов |
 | `GEMINI_EMBEDDING_MODEL` | — | `gemini-embedding-001` | Text embedding model для локального семантического индекса |
 | `EMBEDDING_DIMENSIONS` | — | `768` | Размерность сохраняемых embedding-векторов |
 | `DB_PATH` | — | `./userbot.db` | Путь к SQLite-базе |
