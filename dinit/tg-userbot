@@ -1,0 +1,13 @@
+# ~/.config/dinit/userbot
+
+type = process
+
+working-dir = %h/projects/userbot
+
+command = /bin/sh -c 'set -a; . %h/projects/userbot/.env; set +a; export NODE_ENV=production; exec %h/.bun/bin/bun run index.ts'
+
+restart = on-failure
+restart-delay = 5s
+
+stop-timeout = 30s
+kill-process-group
