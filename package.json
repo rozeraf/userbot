@@ -26,6 +26,7 @@
     "telegram": "^2.22.2"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.3",
     "@types/react": "^19.2.18",
     "drizzle-kit": "^0.31.10",
     "typescript": "^7.0.2"

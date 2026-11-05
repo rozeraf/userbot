@@ -13,6 +13,10 @@ import {
 } from "../../core/workspace";
 import { workspaceChatCommand } from "../commands/workspaceChat";
 
+export type MessageHooks = {
+  lithium?: { onOutgoing(m: { chatId: string; messageId: number; text: string; isCommand: boolean }): void };
+};
+
 function normalizeText(text: string): string {
   return text.replace(/\r\n/g, "\n").trim();
 }

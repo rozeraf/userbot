@@ -4,6 +4,7 @@ import explain from "./explain/init";
 import fix from "./fix/init";
 import find from "./find/init";
 import help from "./help/init";
+// import lithium from "./lithium/init";
 import provider from "./provider/init";
 import person from "./person/init";
 import remind from "./remind/init";
@@ -20,6 +21,7 @@ export const COMMANDS: CommandModule[] = [
   fix,
   find,
   help,
+  lithium,
   person,
   provider,
   remind,
